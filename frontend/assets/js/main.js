@@ -1585,3 +1585,411 @@ function getUserProfile() {
         }
     };
 }
+// Funciones para la página del Asistente IA
+function handleAIAssistant() {
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const chatHistory = document.getElementById('chatHistory');
+    const newChatBtn = document.getElementById('newChatBtn');
+    
+    if (!chatInput || !sendChatBtn || !chatHistory || !newChatBtn) return;
+    
+    // Enviar mensaje
+    const sendMessage = async () => {
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        // Agregar mensaje del usuario
+        appendUserMessage(message);
+        
+        // Limpiar input
+        chatInput.value = '';
+        
+        // Mostrar indicador de carga
+        const loadingIndicator = appendLoadingIndicator();
+        
+        try {
+            // Obtener estilo y nivel de detalle seleccionados
+            const style = document.getElementById('assistantStyle')?.value || 'formal';
+            const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
+            
+            // Enviar mensaje al servidor
+            const response = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                },
+                body: JSON.stringify({
+                    message,
+                    options: {
+                        style,
+                        detailLevel,
+                        temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
+                    }
+                })
+            });
+            
+            // Quitar indicador de carga
+            if (loadingIndicator) {
+                chatHistory.removeChild(loadingIndicator);
+            }
+            
+            if (!response.ok) {
+                throw new Error(`Error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Mostrar respuesta
+            appendAssistantMessage(data.response);
+        } catch (error) {
+            // Quitar indicador de carga si aún existe
+            if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                chatHistory.removeChild(loadingIndicator);
+            }
+            
+            console.error('Error en chat AI:', error);
+            appendAssistantMessage(
+                'Lo siento, ha ocurrido un error al procesar tu mensaje. ' +
+                'Por favor, intenta de nuevo o contacta al soporte técnico.'
+            );
+        }
+    };
+    
+    // Evento para enviar mensaje con el botón
+    sendChatBtn.addEventListener('click', sendMessage);
+    
+    // Evento para enviar mensaje con Enter
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    // Evento para nueva conversación
+    newChatBtn.addEventListener('click', () => {
+        // Limpiar historial excepto el mensaje inicial
+        while (chatHistory.children.length > 1) {
+            chatHistory.removeChild(chatHistory.lastChild);
+        }
+        chatInput.value = '';
+    });
+    
+    // Botones de sugerencias
+    document.querySelectorAll('#contentSuggestions button').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const prompt = btn.dataset.prompt;
+            if (!prompt) return;
+            
+            // Si es un prompt para generar contenido para el informe
+            if (prompt.startsWith('sugerir') || prompt.startsWith('redactar')) {
+                // Verificar si hay un informe activo
+                if (!state.selectedTemplateId) {
+                    showToast('Primero debes seleccionar una plantilla de informe', 'error');
+                    return;
+                }
+                
+                // Reconstruir el botón como mensaje
+                let userMessage = '';
+                switch (prompt) {
+                    case 'sugerir conclusiones':
+                        userMessage = 'Por favor, genera conclusiones para mi informe';
+                        break;
+                    case 'sugerir recomendaciones':
+                        userMessage = 'Por favor, genera recomendaciones para mi informe';
+                        break;
+                    case 'redactar resumen':
+                        userMessage = 'Por favor, genera un resumen ejecutivo para mi informe';
+                        break;
+                    case 'mejorar redacción':
+                        userMessage = 'Por favor, mejora la redacción de mi informe';
+                        break;
+                    default:
+                        userMessage = prompt;
+                }
+                
+                // Mostrar mensaje del usuario
+                appendUserMessage(userMessage);
+                
+                // Mostrar indicador de carga
+                const loadingIndicator = appendLoadingIndicator();
+                
+                try {
+                    // Recopilar datos del informe actual
+                    const reportData = collectReportData();
+                    
+                    // Determinar el tipo de contenido a generar
+                    let sectionType = 'general';
+                    if (prompt.includes('conclusiones')) sectionType = 'conclusions';
+                    if (prompt.includes('recomendaciones')) sectionType = 'recommendations';
+                    if (prompt.includes('resumen')) sectionType = 'summary';
+                    
+                    // Obtener estilo y nivel de detalle seleccionados
+                    const style = document.getElementById('assistantStyle')?.value || 'formal';
+                    const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
+                    
+                    // Generar contenido mediante la API
+                    const response = await fetch('/api/ai/generate-content', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        },
+                        body: JSON.stringify({
+                            sectionType,
+                            reportData,
+                            options: {
+                                style,
+                                detailLevel,
+                                temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
+                            }
+                        })
+                    });
+                    
+                    // Quitar indicador de carga
+                    if (loadingIndicator) {
+                        chatHistory.removeChild(loadingIndicator);
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`Error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Mostrar respuesta
+                    appendAssistantMessage(data.content);
+                } catch (error) {
+                    // Quitar indicador de carga si aún existe
+                    if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                        chatHistory.removeChild(loadingIndicator);
+                    }
+                    
+                    console.error('Error generando contenido:', error);
+                    appendAssistantMessage(
+                        'Lo siento, ha ocurrido un error al generar el contenido. ' +
+                        'Por favor, intenta de nuevo o contacta al soporte técnico.'
+                    );
+                }
+            } else {
+                // Para otros tipos de prompts
+                chatInput.value = prompt;
+                sendMessage();
+            }
+        });
+    });
+}
+
+function appendUserMessage(message) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = 'd-flex mb-3 flex-row-reverse';
+    messageEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-user fs-4 text-secondary"></i>
+        </div>
+        <div class="flex-grow-1 me-3">
+            <div class="bg-primary text-white rounded p-3">
+                <p class="mb-0">${message}</p>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(messageEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return messageEl;
+}
+
+function appendAssistantMessage(message) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return;
+    
+    // Convertir markdown a HTML si es necesario
+    let formattedMessage = message;
+    
+    // Detectar si el mensaje contiene markdown (títulos, listas, etc.)
+    const hasMarkdown = /^#{1,6}\s|(\*|\-|\+|\d+\.)\s|\*\*|\*|_|`/.test(message);
+    
+    if (hasMarkdown) {
+        // Simple conversión de markdown a HTML
+        formattedMessage = message
+            // Headers (## Título -> <h2>Título</h2>)
+            .replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>')
+            .replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>')
+            .replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>')
+            .replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>')
+            .replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>')
+            .replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>')
+            
+            // Bold (**text** -> <strong>text</strong>)
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            
+            // Italic (*text* -> <em>text</em>)
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            
+            // Code blocks (```code``` -> <pre><code>code</code></pre>)
+            .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
+            
+            // Inline code (`code` -> <code>code</code>)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            
+            // Unordered lists
+            .replace(/^\s*[\*\-\+]\s+(.+)$/gm, '<li>$1</li>')
+            
+            // Ordered lists
+            .replace(/^\s*\d+\.\s+(.+)$/gm, '<li>$1</li>')
+            
+            // Wrap lists with <ul> or <ol> tags
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            
+            // Paragraphs (blank lines between text -> <p>text</p>)
+            .replace(/^([^<].+)$/gm, '<p>$1</p>')
+            
+            // Fix duplicate paragraph tags
+            .replace(/<p><p>/g, '<p>')
+            .replace(/<\/p><\/p>/g, '</p>');
+    }
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = 'd-flex mb-3';
+    messageEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-robot fs-4 text-primary"></i>
+        </div>
+        <div class="flex-grow-1 ms-3">
+            <div class="bg-light rounded p-3">
+                <div class="markdown-content">${formattedMessage}</div>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(messageEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return messageEl;
+}
+
+function appendLoadingIndicator() {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return null;
+    
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'd-flex mb-3';
+    loadingEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-robot fs-4 text-primary"></i>
+        </div>
+        <div class="flex-grow-1 ms-3">
+            <div class="bg-light rounded p-3 d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                    <span class="visually-hidden">Pensando...</span>
+                </div>
+                <p class="mb-0">Generando respuesta...</p>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(loadingEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return loadingEl;
+}
+
+// Mejorar texto con IA
+async function enhanceTextWithAI(text, enhancementType) {
+    if (!text) {
+        showToast('No hay texto para mejorar', 'error');
+        return null;
+    }
+    
+    try {
+        // Obtener estilo y nivel de detalle seleccionados
+        const style = document.getElementById('assistantStyle')?.value || 'formal';
+        
+        // Llamar a la API
+        const response = await fetch('/api/ai/enhance-text', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({
+                text,
+                enhancementType,
+                options: {
+                    style
+                }
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.enhancedText;
+    } catch (error) {
+        console.error('Error mejorando texto:', error);
+        showToast('Error al mejorar el texto', 'error');
+        return null;
+    }
+}
+
+// Agregar botón para mejorar texto en campos de texto
+function addTextEnhancementButtons() {
+    // Identificar campos de texto grandes
+    const textareas = document.querySelectorAll('textarea');
+    
+    textareas.forEach(textarea => {
+        // Solo agregar si no tiene ya un botón de mejora
+        if (!textarea.nextElementSibling || !textarea.nextElementSibling.classList.contains('enhance-text-btn')) {
+            const container = document.createElement('div');
+            container.className = 'text-end mt-1 enhance-text-btn';
+            
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'btn-group btn-group-sm';
+            
+            // Botón para mejorar claridad
+            const clarityBtn = document.createElement('button');
+            clarityBtn.type = 'button';
+            clarityBtn.className = 'btn btn-outline-secondary';
+            clarityBtn.innerHTML = '<i class="fas fa-magic"></i> Mejorar claridad';
+            clarityBtn.addEventListener('click', async () => {
+                const enhancedText = await enhanceTextWithAI(textarea.value, 'improve_clarity');
+                if (enhancedText) {
+                    textarea.value = enhancedText;
+                    // Disparar evento input para actualizar cualquier vista previa
+                    textarea.dispatchEvent(new Event('input'));
+                }
+            });
+            
+            // Botón para formalizar
+            const formalBtn = document.createElement('button');
+            formalBtn.type = 'button';
+            formalBtn.className = 'btn btn-outline-secondary';
+            formalBtn.innerHTML = '<i class="fas fa-pen-fancy"></i> Formalizar';
+            formalBtn.addEventListener('click', async () => {
+                const enhancedText = await enhanceTextWithAI(textarea.value, 'formal_tone');
+                if (enhancedText) {
+                    textarea.value = enhancedText;
+                    textarea.dispatchEvent(new Event('input'));
+                }
+            });
+            
+            // Agregar botones al grupo
+            btnGroup.appendChild(clarityBtn);
+            btnGroup.appendChild(formalBtn);
+            
+            // Agregar grupo al contenedor
+            container.appendChild(btnGroup);
+            
+            // Insertar después del textarea
+            textarea.parentNode.insertBefore(container, textarea.nextSibling);
+        }
+    });
+}
