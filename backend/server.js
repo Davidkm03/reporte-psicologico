@@ -12,9 +12,18 @@ const aiService = require('./services/aiService');
 fileService.initializeStorage();
 
 // Initialize AI service
-aiService.initialize({
+console.log('Initializing AI service...');
+const aiClientResult = aiService.initialize({
     apiKey: process.env.OPENAI_API_KEY
 });
+
+if (aiClientResult) {
+    console.log('AI service initialized successfully');
+} else if (process.env.AI_SERVICE_MOCK === 'true') {
+    console.log('AI service initialized in mock mode');
+} else {
+    console.warn('AI service initialization failed - check your OpenAI API key');
+}
 
 // Initialize Express app
 const app = express();

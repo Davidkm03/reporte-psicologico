@@ -3,7 +3,9 @@
  * This service connects to an AI provider (like OpenAI) to generate content.
  */
 
-// Placeholder for OpenAI API or other AI service
+const { OpenAI } = require('openai');
+
+// Variable to store the OpenAI client
 let aiClient = null;
 
 /**
@@ -11,12 +13,24 @@ let aiClient = null;
  * @param {Object} config - Configuration options for the AI service
  */
 const initialize = (config = {}) => {
-    // This is where you would initialize the OpenAI client or other AI service
-    // Example with OpenAI:
-    // const { OpenAI } = require('openai');
-    // aiClient = new OpenAI({ apiKey: config.apiKey });
-    
-    console.log('AI Assistant service initialized', config);
+    try {
+        // Check if API key is available
+        if (!process.env.OPENAI_API_KEY && !config.apiKey) {
+            console.warn('OpenAI API key not found. AI features will use fallback mode.');
+            return null;
+        }
+        
+        // Initialize OpenAI client
+        aiClient = new OpenAI({ 
+            apiKey: config.apiKey || process.env.OPENAI_API_KEY 
+        });
+        
+        console.log('OpenAI client initialized successfully');
+        return aiClient;
+    } catch (error) {
+        console.error('Error initializing OpenAI client:', error);
+        return null;
+    }
 };
 
 /**
@@ -26,33 +40,38 @@ const initialize = (config = {}) => {
  * @returns {Promise<string>} - The AI's response
  */
 const generateResponse = async (prompt, options = {}) => {
-    // If AI client is not initialized, set up a fallback behavior
+    // If AI client is not initialized, try to initialize it
+    if (!aiClient) {
+        aiClient = initialize();
+    }
+    
+    // If still not initialized and not in mock mode, use fallback response
     if (!aiClient && !process.env.AI_SERVICE_MOCK) {
-        console.warn('AI client not initialized. Returning fallback response.');
+        console.warn('AI client not initialized. Using fallback response.');
         return getFallbackResponse(prompt);
     }
     
     try {
         // For development/testing, allow a mock mode
         if (process.env.AI_SERVICE_MOCK === 'true') {
+            console.log('Using mock AI response');
             return getMockResponse(prompt, options);
         }
         
-        // Real implementation with API call would go here
-        // Example with OpenAI:
-        // const completion = await aiClient.chat.completions.create({
-        //     model: options.model || "gpt-3.5-turbo",
-        //     messages: [
-        //         { role: "system", content: options.systemPrompt || "You are a helpful assistant for psychological reports." },
-        //         { role: "user", content: prompt }
-        //     ],
-        //     temperature: options.temperature || 0.7,
-        //     max_tokens: options.maxTokens || 500
-        // });
-        // return completion.choices[0].message.content;
+        // Real implementation with OpenAI
+        console.log('Sending request to OpenAI...');
+        const completion = await aiClient.chat.completions.create({
+            model: options.model || "gpt-3.5-turbo",
+            messages: [
+                { role: "system", content: options.systemPrompt || "You are a helpful assistant for psychological reports. Respond in Spanish." },
+                { role: "user", content: prompt }
+            ],
+            temperature: options.temperature || 0.7,
+            max_tokens: options.maxTokens || 500
+        });
         
-        // Placeholder for now
-        return getFallbackResponse(prompt);
+        console.log('Received response from OpenAI');
+        return completion.choices[0].message.content;
     } catch (error) {
         console.error('Error generating AI response:', error);
         throw new Error('Failed to generate AI response: ' + error.message);
@@ -72,45 +91,45 @@ const generateReportContent = async (sectionType, reportData, options = {}) => {
     
     switch (sectionType) {
         case 'conclusions':
-            prompt = `Generate professional psychological conclusions based on the following assessment data:\n\n`;
+            prompt = `Genera conclusiones psicológicas profesionales basadas en los siguientes datos de evaluación:\n\n`;
             break;
             
         case 'recommendations':
-            prompt = `Generate professional psychological recommendations based on the following assessment data:\n\n`;
+            prompt = `Genera recomendaciones psicológicas profesionales basadas en los siguientes datos de evaluación:\n\n`;
             break;
             
         case 'summary':
-            prompt = `Generate a professional executive summary for a psychological report with the following data:\n\n`;
+            prompt = `Genera un resumen ejecutivo profesional para un informe psicológico con los siguientes datos:\n\n`;
             break;
             
         default:
-            prompt = `Generate professional content for a psychological report section with the following data:\n\n`;
+            prompt = `Genera contenido profesional para una sección de informe psicológico con los siguientes datos:\n\n`;
     }
     
     // Add report data to the prompt
     if (reportData.patient && reportData.patient.name) {
-        prompt += `Patient: ${reportData.patient.name}\n`;
+        prompt += `Paciente: ${reportData.patient.name}\n`;
     }
     
     if (reportData.patient && reportData.patient.age) {
-        prompt += `Age: ${reportData.patient.age}\n`;
+        prompt += `Edad: ${reportData.patient.age}\n`;
     }
     
     // Add all section data
     if (reportData.sections && reportData.sections.length > 0) {
-        prompt += `\nAssessment Data:\n`;
+        prompt += `\nDatos de Evaluación:\n`;
         
         reportData.sections.forEach(section => {
             prompt += `- ${section.name}: `;
             
             if (section.type === 'text') {
-                prompt += `${section.value || 'Not provided'}\n`;
+                prompt += `${section.value || 'No proporcionado'}\n`;
             } else if (section.type === 'checkbox' && section.values && section.values.length > 0) {
                 prompt += `${section.values.join(', ')}\n`;
             } else if ((section.type === 'radio' || section.type === 'select') && section.value) {
                 prompt += `${section.value}\n`;
             } else {
-                prompt += `Not provided\n`;
+                prompt += `No proporcionado\n`;
             }
         });
     }
@@ -118,33 +137,33 @@ const generateReportContent = async (sectionType, reportData, options = {}) => {
     // Add specific instructions based on section type
     switch (sectionType) {
         case 'conclusions':
-            prompt += `\nPlease generate comprehensive psychological conclusions based on the above data. Include:
-1. Summary of key findings
-2. Potential psychological diagnosis if applicable
-3. Strengths and challenges identified
-4. Overall psychological status
+            prompt += `\nPor favor, genera conclusiones psicológicas completas basadas en los datos anteriores. Incluye:
+1. Resumen de hallazgos principales
+2. Posible diagnóstico psicológico si es aplicable
+3. Fortalezas y desafíos identificados
+4. Estado psicológico general
 
-Use a professional, clinical tone appropriate for a psychological report.`;
+Usa un tono profesional y clínico apropiado para un informe psicológico.`;
             break;
             
         case 'recommendations':
-            prompt += `\nPlease generate appropriate psychological recommendations based on the above data. Include:
-1. Recommended interventions or treatments
-2. Frequency and duration suggestions
-3. Additional assessments if needed
-4. Support resources for the patient/family
+            prompt += `\nPor favor, genera recomendaciones psicológicas apropiadas basadas en los datos anteriores. Incluye:
+1. Intervenciones o tratamientos recomendados
+2. Sugerencias de frecuencia y duración
+3. Evaluaciones adicionales si fueran necesarias
+4. Recursos de apoyo para el paciente/familia
 
-Format as a numbered list in order of priority.`;
+Formátalo como una lista numerada en orden de prioridad.`;
             break;
             
         case 'summary':
-            prompt += `\nPlease generate a concise executive summary for this psychological assessment. Keep it to approximately 150-200 words.`;
+            prompt += `\nPor favor, genera un resumen ejecutivo conciso para esta evaluación psicológica. Mantenlo en aproximadamente 150-200 palabras.`;
             break;
     }
     
     // Add style guidelines if provided
     if (options.style) {
-        prompt += `\n\nPlease use a ${options.style} writing style.`;
+        prompt += `\n\nPor favor, usa un estilo de escritura ${options.style}.`;
     }
     
     // Generate response
@@ -160,30 +179,30 @@ Format as a numbered list in order of priority.`;
  */
 const enhanceText = async (originalText, enhancementType, options = {}) => {
     if (!originalText) {
-        return "Please provide text to enhance.";
+        return "Por favor proporciona texto para mejorar.";
     }
     
     let prompt = '';
     
     switch (enhancementType) {
         case 'improve_clarity':
-            prompt = `Improve the clarity and readability of the following text while maintaining the professional tone:\n\n${originalText}`;
+            prompt = `Mejora la claridad y legibilidad del siguiente texto manteniendo el tono profesional:\n\n${originalText}`;
             break;
             
         case 'formal_tone':
-            prompt = `Rewrite the following text to have a more formal, professional tone suitable for a psychological report:\n\n${originalText}`;
+            prompt = `Reescribe el siguiente texto para tener un tono más formal y profesional adecuado para un informe psicológico:\n\n${originalText}`;
             break;
             
         case 'simplify':
-            prompt = `Simplify the following text to be more accessible while maintaining the professional meaning:\n\n${originalText}`;
+            prompt = `Simplifica el siguiente texto para que sea más accesible manteniendo el significado profesional:\n\n${originalText}`;
             break;
             
         case 'expand':
-            prompt = `Expand on the following text to provide more detail and depth while maintaining the professional tone:\n\n${originalText}`;
+            prompt = `Amplía el siguiente texto para proporcionar más detalle y profundidad manteniendo el tono profesional:\n\n${originalText}`;
             break;
             
         default:
-            prompt = `Improve the following text while maintaining its core meaning:\n\n${originalText}`;
+            prompt = `Mejora el siguiente texto manteniendo su significado central:\n\n${originalText}`;
     }
     
     return generateResponse(prompt, options);

@@ -1053,7 +1053,7 @@ function updateReportPreview() {
     previewPanel.appendChild(preview);
 }
 
-// Funciones para la página del Asistente IA
+// Funciones para la página del Asistente IA (usando Open AI directamente)
 function handleAIAssistant() {
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
@@ -1062,22 +1062,74 @@ function handleAIAssistant() {
     
     if (!chatInput || !sendChatBtn || !chatHistory || !newChatBtn) return;
     
-    // Enviar mensaje
-    const sendMessage = () => {
+    // Enviar mensaje a Open AI
+    const sendMessage = async () => {
+        if (!isAuthenticated()) {
+            showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
+            return;
+        }
+        
         const message = chatInput.value.trim();
-        if (!message) return;
+        if (!message) {
+            showToast('Por favor, escribe un mensaje.', 'warning');
+            return;
+        }
+        
+        const apiKey = localStorage.getItem('openAIKey');
+        if (!apiKey) {
+            showToast('Por favor, configura tu API Key en la pestaña de Configuración.', 'error');
+            return;
+        }
         
         // Agregar mensaje del usuario
         appendUserMessage(message);
-        
-        // Limpiar input
         chatInput.value = '';
         
-        // Simular respuesta del asistente después de un breve retraso
-        setTimeout(() => {
-            const response = `He recibido tu mensaje: "${message}". Esta es una simulación de respuesta. En un sistema real, esto se conectaría a un servicio de IA como OpenAI para generar respuestas contextuales.`;
-            appendAssistantMessage(response);
-        }, 1000);
+        // Mostrar indicador de carga
+        const loadingIndicator = appendLoadingIndicator();
+        
+        try {
+            const style = document.getElementById('assistantStyle')?.value || 'formal';
+            const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
+            const temperature = detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5;
+            
+            const prompt = `Actúa como un asistente especializado en informes psicológicos con un estilo de redacción "${style}" y un nivel de detalle "${detailLevel}". Responde al siguiente mensaje: "${message}"`;
+            
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                        { role: 'system', content: 'Eres un asistente especializado en informes psicológicos.' },
+                        { role: 'user', content: prompt }
+                    ],
+                    max_tokens: detailLevel === 'detailed' ? 1000 : detailLevel === 'brief' ? 200 : 500,
+                    temperature: temperature
+                })
+            });
+            
+            // Quitar indicador de carga
+            if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                chatHistory.removeChild(loadingIndicator);
+            }
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `Error ${response.status}`);
+            }
+            
+            const data = await response.json();
+            appendAssistantMessage(data.choices[0].message.content.trim());
+        } catch (error) {
+            if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                chatHistory.removeChild(loadingIndicator);
+            }
+            appendAssistantMessage(`Lo siento, ocurrió un error: ${error.message}. Verifica tu API Key o intenta de nuevo.`);
+        }
     };
     
     // Evento para enviar mensaje con el botón
@@ -1093,6 +1145,10 @@ function handleAIAssistant() {
     
     // Evento para nueva conversación
     newChatBtn.addEventListener('click', () => {
+        if (!isAuthenticated()) {
+            showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
+            return;
+        }
         // Limpiar historial excepto el mensaje inicial
         while (chatHistory.children.length > 1) {
             chatHistory.removeChild(chatHistory.lastChild);
@@ -1102,11 +1158,102 @@ function handleAIAssistant() {
     
     // Botones de sugerencias
     document.querySelectorAll('#contentSuggestions button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const prompt = btn.dataset.prompt;
-            if (prompt) {
-                chatInput.value = prompt;
-                sendMessage();
+        btn.addEventListener('click', async () => {
+            const promptType = btn.dataset.prompt;
+            if (!promptType) return;
+            
+            if (!isAuthenticated()) {
+                showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
+                return;
+            }
+            
+            const apiKey = localStorage.getItem('openAIKey');
+            if (!apiKey) {
+                showToast('Por favor, configura tu API Key en la pestaña de Configuración.', 'error');
+                return;
+            }
+            
+            let userMessage = '';
+            let sectionType = 'general';
+            
+            switch (promptType) {
+                case 'sugerir conclusiones':
+                    userMessage = 'Sugiere conclusiones para un informe psicológico basado en una evaluación general.';
+                    sectionType = 'conclusions';
+                    break;
+                case 'sugerir recomendaciones':
+                    userMessage = 'Propón recomendaciones para un paciente tras una evaluación psicológica.';
+                    sectionType = 'recommendations';
+                    break;
+                case 'redactar resumen':
+                    userMessage = 'Redacta un resumen ejecutivo para un informe psicológico.';
+                    sectionType = 'summary';
+                    break;
+                case 'mejorar redacción':
+                    userMessage = 'Mejora la redacción de este texto: "El paciente muestra ansiedad alta y dificultades para dormir."';
+                    break;
+                default:
+                    userMessage = promptType;
+            }
+            
+            // Si es un prompt relacionado con el informe, incluir datos del informe
+            if (promptType.startsWith('sugerir') || promptType.startsWith('redactar')) {
+                if (!state.selectedTemplateId) {
+                    showToast('Primero debes seleccionar una plantilla de informe', 'error');
+                    return;
+                }
+                
+                const reportData = collectReportData();
+                userMessage = `${userMessage}\nDatos del informe: ${JSON.stringify(reportData, null, 2)}`;
+            }
+            
+            // Mostrar mensaje del usuario
+            appendUserMessage(userMessage);
+            
+            // Mostrar indicador de carga
+            const loadingIndicator = appendLoadingIndicator();
+            
+            try {
+                const style = document.getElementById('assistantStyle')?.value || 'formal';
+                const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
+                const temperature = detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5;
+                
+                const prompt = `Actúa como un asistente especializado en informes psicológicos con un estilo de redacción "${style}" y un nivel de detalle "${detailLevel}". Responde al siguiente mensaje: "${userMessage}"`;
+                
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            { role: 'system', content: 'Eres un asistente especializado en informes psicológicos.' },
+                            { role: 'user', content: prompt }
+                        ],
+                        max_tokens: detailLevel === 'detailed' ? 1000 : detailLevel === 'brief' ? 200 : 500,
+                        temperature: temperature
+                    })
+                });
+                
+                // Quitar indicador de carga
+                if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                    chatHistory.removeChild(loadingIndicator);
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `Error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                appendAssistantMessage(data.choices[0].message.content.trim());
+            } catch (error) {
+                if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                    chatHistory.removeChild(loadingIndicator);
+                }
+                appendAssistantMessage(`Lo siento, ocurrió un error: ${error.message}. Verifica tu API Key o intenta de nuevo.`);
             }
         });
     });
@@ -1131,6 +1278,8 @@ function appendUserMessage(message) {
     
     chatHistory.appendChild(messageEl);
     chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return messageEl;
 }
 
 function appendAssistantMessage(message) {
@@ -1152,11 +1301,374 @@ function appendAssistantMessage(message) {
     
     chatHistory.appendChild(messageEl);
     chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return messageEl;
 }
 
-// Funciones para la configuración del perfil y ajustes
+function appendLoadingIndicator() {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return null;
+    
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'd-flex mb-3';
+    loadingEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-robot fs-4 text-primary"></i>
+        </div>
+        <div class="flex-grow-1 ms-3">
+            <div class="bg-light rounded p-3 d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                    <span class="visually-hidden">Pensando...</span>
+                </div>
+                <p class="mb-0">Generando respuesta...</p>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(loadingEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    
+    return loadingEl;
+}
+
+// Guardar informe
+function saveReport() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // Recopilar datos del formulario
+    const reportData = collectReportData();
+    
+    // En un sistema real, aquí se enviaría a la API
+    showToast('Informe guardado correctamente', 'success');
+    console.log('Datos del informe:', reportData);
+}
+
+// Guardar borrador
+function saveReportDraft() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // Recopilar datos del formulario
+    const reportData = collectReportData();
+    
+    // Guardar en localStorage
+    try {
+        localStorage.setItem('reportDraft', JSON.stringify(reportData));
+        showToast('Borrador guardado localmente', 'success');
+    } catch (error) {
+        handleError(error, 'Error al guardar borrador');
+    }
+}
+
+// Recopilar datos del informe
+function collectReportData() {
+    const template = config.templates.find(t => t._id === state.selectedTemplateId);
+    if (!template) return null;
+    
+    const data = {
+        templateId: template._id,
+        templateName: template.name,
+        patient: {
+            name: document.getElementById('patientName')?.value || '',
+            age: document.getElementById('patientAge')?.value || '',
+            id: document.getElementById('patientId')?.value || '',
+            phone: document.getElementById('patientPhone')?.value || ''
+        },
+        date: document.getElementById('reportDate')?.value || new Date().toISOString().split('T')[0],
+        professional: {
+            name: document.getElementById('professionalName')?.value || '',
+            license: document.getElementById('professionalLicense')?.value || '',
+            specialty: document.getElementById('professionalSpecialty')?.value || ''
+        },
+        sections: []
+    };
+    
+    // Recopilar datos de secciones
+    if (template.sections && template.sections.length > 0) {
+        template.sections.forEach((section, index) => {
+            const sectionData = {
+                name: section.name,
+                type: section.type,
+                required: section.required
+            };
+            
+            switch (section.type) {
+                case 'text':
+                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
+                    break;
+                    
+                case 'checkbox':
+                    sectionData.values = [];
+                    if (section.options && section.options.length > 0) {
+                        section.options.forEach((option, optIndex) => {
+                            const isChecked = document.getElementById(`section_${index}_opt_${optIndex}`)?.checked;
+                            if (isChecked) {
+                                sectionData.values.push(option);
+                            }
+                        });
+                    }
+                    break;
+                    
+                case 'radio':
+                    sectionData.value = document.querySelector(`input[name="section_${index}"]:checked`)?.value || '';
+                    break;
+                    
+                case 'select':
+                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
+                    break;
+            }
+            
+            data.sections.push(sectionData);
+        });
+    }
+    
+    return data;
+}
+
+// Previsualizar informe
+function previewReport() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // En un sistema real, esto generaría un PDF temporal
+    const reportData = collectReportData();
+    
+    try {
+        fetch('/api/reports/preview-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ reportData })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al generar vista previa');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Crear URL para el blob
+            const url = window.URL.createObjectURL(blob);
+            
+            // Abrir en nueva ventana
+            window.open(url, '_blank');
+            
+            // Liberar URL después de un tiempo
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+            }, 30000);
+        })
+        .catch(error => {
+            handleError(error, 'Error al previsualizar informe');
+        });
+    } catch (error) {
+        handleError(error, 'Error al previsualizar informe');
+    }
+}
+
+// Descargar PDF
+function downloadReportPdf() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // Recopilar datos del formulario
+    const reportData = collectReportData();
+    
+    // Enviar datos para generación y descarga de PDF
+    try {
+        fetch('/api/reports/generate-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ reportData })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al generar PDF');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Crear nombre de archivo
+            const patientName = reportData.patient.name || 'paciente';
+            const date = new Date().toISOString().slice(0, 10);
+            const filename = `informe_${patientName.replace(/\s+/g, '_')}_${date}.pdf`;
+            
+            // Crear URL para el blob
+            const url = window.URL.createObjectURL(blob);
+            
+            // Crear enlace invisible para descarga
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            
+            // Agregar a documento, hacer clic y eliminar
+            document.body.appendChild(a);
+            a.click();
+            
+            // Limpiar
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showToast('PDF descargado correctamente', 'success');
+        })
+        .catch(error => {
+            handleError(error, 'Error al descargar PDF');
+        });
+    } catch (error) {
+        handleError(error, 'Error al descargar PDF');
+    }
+}
+
+// Cambiar contraseña
+function changePassword() {
+    const currentPassword = document.getElementById('currentPassword')?.value;
+    const newPassword = document.getElementById('newPassword')?.value;
+    const confirmNewPassword = document.getElementById('confirmNewPassword')?.value;
+    
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+        showToast('Todos los campos son obligatorios', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmNewPassword) {
+        showToast('Las contraseñas no coinciden', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showToast('La contraseña debe tener al menos 8 caracteres', 'error');
+        return;
+    }
+    
+    // En un sistema real, aquí se enviaría a la API
+    try {
+        fetch('/api/auth/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({ 
+                currentPassword, 
+                newPassword 
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401) {
+                    throw new Error('Contraseña actual incorrecta');
+                }
+                throw new Error('Error al cambiar contraseña');
+            }
+            return response.json();
+        })
+        .then(data => {
+            showToast('Contraseña cambiada correctamente', 'success');
+            
+            // Limpiar campos
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+        })
+        .catch(error => {
+            handleError(error, error.message);
+        });
+    } catch (error) {
+        handleError(error, 'Error al cambiar contraseña');
+    }
+}
+
+// Enviar email de verificación
+function sendVerificationEmail() {
+    // En un sistema real, aquí se enviaría a la API
+    try {
+        fetch('/api/auth/send-verification', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al enviar email de verificación');
+            }
+            return response.json();
+        })
+        .then(data => {
+            showToast('Correo de verificación enviado', 'success');
+        })
+        .catch(error => {
+            handleError(error, 'Error al enviar email de verificación');
+        });
+    } catch (error) {
+        handleError(error, 'Error al enviar email de verificación');
+    }
+}
+
+// Limpiar caché
+function clearCache() {
+    // Mostrar confirmación
+    if (!confirm('¿Está seguro de limpiar la caché? Esto eliminará todos los datos guardados localmente.')) {
+        return;
+    }
+    
+    // Limpiar localStorage (excepto token de autenticación)
+    const authToken = localStorage.getItem('authToken');
+    localStorage.clear();
+    localStorage.setItem('authToken', authToken);
+
+    // Actualizar información de almacenamiento
+    updateStorageInfo();
+    
+    showToast('Caché limpiada correctamente', 'success');
+    
+    // Recargar la página para reiniciar la aplicación
+    setTimeout(() => {
+        window.location.reload();
+    }, 1500);
+}
+
+// Actualizar información de almacenamiento
+function updateStorageInfo() {
+    // Estimar el uso de almacenamiento
+    let storageUsed = 0;
+    
+    // Contar bytes de cada item en localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        storageUsed += key.length + value.length;
+    }
+    
+    // Convertir a KB
+    const storageKB = Math.round(storageUsed / 1024);
+    
+    // Actualizar interfaz
+    document.getElementById('storageUsed')?.textContent = `${storageKB} KB de 5 MB`;
+    
+    // Actualizar barra de progreso (5 MB = 5120 KB)
+    const percentage = Math.min(100, (storageKB / 5120) * 100);
+    document.getElementById('storageProgress')?.style.setProperty('width', `${percentage}%`);
+}
+
+// Obtener información del usuario
 function getUserProfile() {
-    // En un sistema real, este perfil vendría de la API
+    // Función ya implementada arriba
     return {
         _id: config.userId,
         email: 'usuario@ejemplo.com',
@@ -1169,30 +1681,103 @@ function getUserProfile() {
     };
 }
 
-function loadUserProfile() {
-    const profile = getUserProfile();
-    if (!profile) return;
+// Mejorar texto con IA
+async function enhanceTextWithAI(text, enhancementType) {
+    if (!text) {
+        showToast('No hay texto para mejorar', 'error');
+        return null;
+    }
     
-    // Actualizar campos del perfil
-    document.getElementById('settingsFullName')?.value = profile.profile?.fullName || '';
-    document.getElementById('settingsLicense')?.value = profile.profile?.licenseNumber || '';
-    document.getElementById('settingsSpecialty')?.value = profile.profile?.specialty || '';
-    document.getElementById('settingsEmail')?.value = profile.email || '';
-    document.getElementById('settingsPhone')?.value = profile.profile?.phone || '';
-    
-    // Actualizar estado de verificación de email
-    updateEmailVerificationStatus(false); // Simulando que no está verificado
+    try {
+        // Obtener estilo seleccionado
+        const style = document.getElementById('assistantStyle')?.value || 'formal';
+        
+        // Mostrar indicador de carga
+        showToast('Mejorando texto...', 'info');
+        
+        // Llamar a la API
+        const response = await fetch('/api/ai/enhance-text', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            },
+            body: JSON.stringify({
+                text,
+                enhancementType,
+                options: {
+                    style
+                }
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        showToast('Texto mejorado correctamente', 'success');
+        return data.enhancedText;
+    } catch (error) {
+        console.error('Error mejorando texto:', error);
+        showToast('Error al mejorar el texto', 'error');
+        return null;
+    }
 }
 
-function updateEmailVerificationStatus(isVerified) {
-    const statusElement = document.getElementById('emailVerificationStatus');
-    if (!statusElement) return;
+// Agregar botón para mejorar texto en campos de texto
+function addTextEnhancementButtons() {
+    // Identificar campos de texto grandes
+    const textareas = document.querySelectorAll('textarea');
     
-    if (isVerified) {
-        statusElement.innerHTML = '<span class="badge bg-success">Verificado</span>';
-    } else {
-        statusElement.innerHTML = '<span class="badge bg-warning">No verificado</span>';
-    }
+    textareas.forEach(textarea => {
+        // Solo agregar si no tiene ya un botón de mejora
+        if (!textarea.nextElementSibling || !textarea.nextElementSibling.classList.contains('enhance-text-btn')) {
+            const container = document.createElement('div');
+            container.className = 'text-end mt-1 enhance-text-btn';
+            
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'btn-group btn-group-sm';
+            
+            // Botón para mejorar claridad
+            const clarityBtn = document.createElement('button');
+            clarityBtn.type = 'button';
+            clarityBtn.className = 'btn btn-outline-secondary';
+            clarityBtn.innerHTML = '<i class="fas fa-magic"></i> Mejorar claridad';
+            clarityBtn.addEventListener('click', async () => {
+                const enhancedText = await enhanceTextWithAI(textarea.value, 'improve_clarity');
+                if (enhancedText) {
+                    textarea.value = enhancedText;
+                    // Disparar evento input para actualizar cualquier vista previa
+                    textarea.dispatchEvent(new Event('input'));
+                }
+            });
+            
+            // Botón para formalizar
+            const formalBtn = document.createElement('button');
+            formalBtn.type = 'button';
+            formalBtn.className = 'btn btn-outline-secondary';
+            formalBtn.innerHTML = '<i class="fas fa-pen-fancy"></i> Formalizar';
+            formalBtn.addEventListener('click', async () => {
+                const enhancedText = await enhanceTextWithAI(textarea.value, 'formal_tone');
+                if (enhancedText) {
+                    textarea.value = enhancedText;
+                    textarea.dispatchEvent(new Event('input'));
+                }
+            });
+            
+            // Agregar botones al grupo
+            btnGroup.appendChild(clarityBtn);
+            btnGroup.appendChild(formalBtn);
+            
+            // Agregar grupo al contenedor
+            container.appendChild(btnGroup);
+            
+            // Insertar después del textarea
+            textarea.parentNode.insertBefore(container, textarea.nextSibling);
+        }
+    });
 }
 
 // Inicializar todo cuando el DOM esté cargado
@@ -1242,8 +1827,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('templateSearch')?.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             document.querySelectorAll('#templateList a').forEach(item => {
-                const name = item.querySelector('h6').textContent.toLowerCase();
-                const category = item.querySelector('small').textContent.toLowerCase();
+                const name = item.querySelector('h6')?.textContent.toLowerCase() || '';
+                const category = item.querySelector('small')?.textContent.toLowerCase() || '';
                 
                 if (name.includes(searchTerm) || category.includes(searchTerm)) {
                     item.style.display = '';
@@ -1355,641 +1940,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Manejar asistente IA
         handleAIAssistant();
+        
+        // Agregar botones de mejora de texto
+        addTextEnhancementButtons();
+        
     } catch (error) {
         handleError(error, 'Error al inicializar la aplicación');
     }
 });
-
-// Guardar informe
-function saveReport() {
-    if (!state.selectedTemplateId) {
-        showToast('Debe seleccionar una plantilla', 'error');
-        return;
-    }
-    
-    // Recopilar datos del formulario
-    const reportData = collectReportData();
-    
-    // En un sistema real, aquí se enviaría a la API
-    showToast('Informe guardado correctamente', 'success');
-    console.log('Datos del informe:', reportData);
-}
-
-// Guardar borrador
-function saveReportDraft() {
-    if (!state.selectedTemplateId) {
-        showToast('Debe seleccionar una plantilla', 'error');
-        return;
-    }
-    
-    // Recopilar datos del formulario
-    const reportData = collectReportData();
-    
-    // Guardar en localStorage
-    try {
-        localStorage.setItem('reportDraft', JSON.stringify(reportData));
-        showToast('Borrador guardado localmente', 'success');
-    } catch (error) {
-        handleError(error, 'Error al guardar borrador');
-    }
-}
-
-// Recopilar datos del informe
-function collectReportData() {
-    const template = config.templates.find(t => t._id === state.selectedTemplateId);
-    if (!template) return null;
-    
-    const data = {
-        templateId: template._id,
-        templateName: template.name,
-        patient: {
-            name: document.getElementById('patientName')?.value || '',
-            age: document.getElementById('patientAge')?.value || '',
-            id: document.getElementById('patientId')?.value || '',
-            phone: document.getElementById('patientPhone')?.value || ''
-        },
-        date: document.getElementById('reportDate')?.value || new Date().toISOString().split('T')[0],
-        professional: {
-            name: document.getElementById('professionalName')?.value || '',
-            license: document.getElementById('professionalLicense')?.value || '',
-            specialty: document.getElementById('professionalSpecialty')?.value || ''
-        },
-        sections: []
-    };
-    
-    // Recopilar datos de secciones
-    if (template.sections && template.sections.length > 0) {
-        template.sections.forEach((section, index) => {
-            const sectionData = {
-                name: section.name,
-                type: section.type,
-                required: section.required
-            };
-            
-            switch (section.type) {
-                case 'text':
-                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
-                    break;
-                    
-                case 'checkbox':
-                    sectionData.values = [];
-                    if (section.options && section.options.length > 0) {
-                        section.options.forEach((option, optIndex) => {
-                            const isChecked = document.getElementById(`section_${index}_opt_${optIndex}`)?.checked;
-                            if (isChecked) {
-                                sectionData.values.push(option);
-                            }
-                        });
-                    }
-                    break;
-                    
-                case 'radio':
-                    sectionData.value = document.querySelector(`input[name="section_${index}"]:checked`)?.value || '';
-                    break;
-                    
-                case 'select':
-                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
-                    break;
-            }
-            
-            data.sections.push(sectionData);
-        });
-    }
-    
-    return data;
-}
-
-// Previsualizar informe
-function previewReport() {
-    if (!state.selectedTemplateId) {
-        showToast('Debe seleccionar una plantilla', 'error');
-        return;
-    }
-    
-    // En un sistema real, esto generaría un PDF temporal
-    const reportData = collectReportData();
-    
-    // Simular previsualización
-    showToast('Función de previsualización no implementada en la demo', 'info');
-    console.log('Vista previa del informe:', reportData);
-}
-
-// Descargar PDF
-function downloadReportPdf() {
-    if (!state.selectedTemplateId) {
-        showToast('Debe seleccionar una plantilla', 'error');
-        return;
-    }
-    
-    // En un sistema real, esto generaría y descargaría un PDF
-    const reportData = collectReportData();
-    
-    // Simular descarga
-    showToast('Función de descarga no implementada en la demo', 'info');
-    console.log('Descarga de PDF:', reportData);
-}
-
-// Cambiar contraseña
-function changePassword() {
-    const currentPassword = document.getElementById('currentPassword')?.value;
-    const newPassword = document.getElementById('newPassword')?.value;
-    const confirmNewPassword = document.getElementById('confirmNewPassword')?.value;
-    
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-        showToast('Todos los campos son obligatorios', 'error');
-        return;
-    }
-    
-    if (newPassword !== confirmNewPassword) {
-        showToast('Las contraseñas no coinciden', 'error');
-        return;
-    }
-    
-    if (newPassword.length < 8) {
-        showToast('La contraseña debe tener al menos 8 caracteres', 'error');
-        return;
-    }
-    
-    // En un sistema real, aquí se enviaría a la API
-    showToast('Contraseña cambiada correctamente', 'success');
-    
-    // Limpiar campos
-    document.getElementById('currentPassword').value = '';
-    document.getElementById('newPassword').value = '';
-    document.getElementById('confirmNewPassword').value = '';
-}
-
-// Enviar email de verificación
-function sendVerificationEmail() {
-    // En un sistema real, aquí se enviaría a la API
-    showToast('Correo de verificación enviado', 'success');
-}
-
-// Limpiar caché
-function clearCache() {
-    // Mostrar confirmación
-    if (!confirm('¿Está seguro de limpiar la caché? Esto eliminará todos los datos guardados localmente.')) {
-        return;
-    }
-    
-    // Limpiar localStorage (excepto token de autenticación)
-    const authToken = localStorage.getItem('authToken');
-    localStorage.clear();
-    localStorage.setItem('authToken', authToken);
-    
-    // Actualizar información de almacenamiento
-    updateStorageInfo();
-    
-    showToast('Caché limpiada correctamente', 'success');
-    
-    // Recargar la página para reiniciar la aplicación
-    setTimeout(() => {
-        window.location.reload();
-    }, 1500);
-}
-
-// Actualizar información de almacenamiento
-function updateStorageInfo() {
-    // Estimar el uso de almacenamiento
-    let storageUsed = 0;
-    
-    // Contar bytes de cada item en localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        const value = localStorage.getItem(key);
-        storageUsed += key.length + value.length;
-    }
-    
-    // Convertir a KB
-    const storageKB = Math.round(storageUsed / 1024);
-    
-    // Actualizar interfaz
-    document.getElementById('storageUsed')?.textContent = `${storageKB} KB de 5 MB`;
-    
-    // Actualizar barra de progreso (5 MB = 5120 KB)
-    const percentage = Math.min(100, (storageKB / 5120) * 100);
-    document.getElementById('storageProgress')?.style.setProperty('width', `${percentage}%`);
-}
-
-// Obtener información del usuario
-function getUserProfile() {
-    // Función ya implementada arriba
-    return {
-        _id: config.userId,
-        email: 'usuario@ejemplo.com',
-        profile: {
-            fullName: 'Dr. Juan Pérez',
-            licenseNumber: 'PSY12345',
-            specialty: 'Psicología Clínica',
-            phone: '123-456-7890'
-        }
-    };
-}
-// Funciones para la página del Asistente IA
-function handleAIAssistant() {
-    const chatInput = document.getElementById('chatInput');
-    const sendChatBtn = document.getElementById('sendChatBtn');
-    const chatHistory = document.getElementById('chatHistory');
-    const newChatBtn = document.getElementById('newChatBtn');
-    
-    if (!chatInput || !sendChatBtn || !chatHistory || !newChatBtn) return;
-    
-    // Enviar mensaje
-    const sendMessage = async () => {
-        const message = chatInput.value.trim();
-        if (!message) return;
-        
-        // Agregar mensaje del usuario
-        appendUserMessage(message);
-        
-        // Limpiar input
-        chatInput.value = '';
-        
-        // Mostrar indicador de carga
-        const loadingIndicator = appendLoadingIndicator();
-        
-        try {
-            // Obtener estilo y nivel de detalle seleccionados
-            const style = document.getElementById('assistantStyle')?.value || 'formal';
-            const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
-            
-            // Enviar mensaje al servidor
-            const response = await fetch('/api/ai/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                },
-                body: JSON.stringify({
-                    message,
-                    options: {
-                        style,
-                        detailLevel,
-                        temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
-                    }
-                })
-            });
-            
-            // Quitar indicador de carga
-            if (loadingIndicator) {
-                chatHistory.removeChild(loadingIndicator);
-            }
-            
-            if (!response.ok) {
-                throw new Error(`Error: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // Mostrar respuesta
-            appendAssistantMessage(data.response);
-        } catch (error) {
-            // Quitar indicador de carga si aún existe
-            if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
-                chatHistory.removeChild(loadingIndicator);
-            }
-            
-            console.error('Error en chat AI:', error);
-            appendAssistantMessage(
-                'Lo siento, ha ocurrido un error al procesar tu mensaje. ' +
-                'Por favor, intenta de nuevo o contacta al soporte técnico.'
-            );
-        }
-    };
-    
-    // Evento para enviar mensaje con el botón
-    sendChatBtn.addEventListener('click', sendMessage);
-    
-    // Evento para enviar mensaje con Enter
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-    
-    // Evento para nueva conversación
-    newChatBtn.addEventListener('click', () => {
-        // Limpiar historial excepto el mensaje inicial
-        while (chatHistory.children.length > 1) {
-            chatHistory.removeChild(chatHistory.lastChild);
-        }
-        chatInput.value = '';
-    });
-    
-    // Botones de sugerencias
-    document.querySelectorAll('#contentSuggestions button').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const prompt = btn.dataset.prompt;
-            if (!prompt) return;
-            
-            // Si es un prompt para generar contenido para el informe
-            if (prompt.startsWith('sugerir') || prompt.startsWith('redactar')) {
-                // Verificar si hay un informe activo
-                if (!state.selectedTemplateId) {
-                    showToast('Primero debes seleccionar una plantilla de informe', 'error');
-                    return;
-                }
-                
-                // Reconstruir el botón como mensaje
-                let userMessage = '';
-                switch (prompt) {
-                    case 'sugerir conclusiones':
-                        userMessage = 'Por favor, genera conclusiones para mi informe';
-                        break;
-                    case 'sugerir recomendaciones':
-                        userMessage = 'Por favor, genera recomendaciones para mi informe';
-                        break;
-                    case 'redactar resumen':
-                        userMessage = 'Por favor, genera un resumen ejecutivo para mi informe';
-                        break;
-                    case 'mejorar redacción':
-                        userMessage = 'Por favor, mejora la redacción de mi informe';
-                        break;
-                    default:
-                        userMessage = prompt;
-                }
-                
-                // Mostrar mensaje del usuario
-                appendUserMessage(userMessage);
-                
-                // Mostrar indicador de carga
-                const loadingIndicator = appendLoadingIndicator();
-                
-                try {
-                    // Recopilar datos del informe actual
-                    const reportData = collectReportData();
-                    
-                    // Determinar el tipo de contenido a generar
-                    let sectionType = 'general';
-                    if (prompt.includes('conclusiones')) sectionType = 'conclusions';
-                    if (prompt.includes('recomendaciones')) sectionType = 'recommendations';
-                    if (prompt.includes('resumen')) sectionType = 'summary';
-                    
-                    // Obtener estilo y nivel de detalle seleccionados
-                    const style = document.getElementById('assistantStyle')?.value || 'formal';
-                    const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
-                    
-                    // Generar contenido mediante la API
-                    const response = await fetch('/api/ai/generate-content', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                        },
-                        body: JSON.stringify({
-                            sectionType,
-                            reportData,
-                            options: {
-                                style,
-                                detailLevel,
-                                temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
-                            }
-                        })
-                    });
-                    
-                    // Quitar indicador de carga
-                    if (loadingIndicator) {
-                        chatHistory.removeChild(loadingIndicator);
-                    }
-                    
-                    if (!response.ok) {
-                        throw new Error(`Error: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // Mostrar respuesta
-                    appendAssistantMessage(data.content);
-                } catch (error) {
-                    // Quitar indicador de carga si aún existe
-                    if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
-                        chatHistory.removeChild(loadingIndicator);
-                    }
-                    
-                    console.error('Error generando contenido:', error);
-                    appendAssistantMessage(
-                        'Lo siento, ha ocurrido un error al generar el contenido. ' +
-                        'Por favor, intenta de nuevo o contacta al soporte técnico.'
-                    );
-                }
-            } else {
-                // Para otros tipos de prompts
-                chatInput.value = prompt;
-                sendMessage();
-            }
-        });
-    });
-}
-
-function appendUserMessage(message) {
-    const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return;
-    
-    const messageEl = document.createElement('div');
-    messageEl.className = 'd-flex mb-3 flex-row-reverse';
-    messageEl.innerHTML = `
-        <div class="flex-shrink-0">
-            <i class="fas fa-user fs-4 text-secondary"></i>
-        </div>
-        <div class="flex-grow-1 me-3">
-            <div class="bg-primary text-white rounded p-3">
-                <p class="mb-0">${message}</p>
-            </div>
-        </div>
-    `;
-    
-    chatHistory.appendChild(messageEl);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-    
-    return messageEl;
-}
-
-function appendAssistantMessage(message) {
-    const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return;
-    
-    // Convertir markdown a HTML si es necesario
-    let formattedMessage = message;
-    
-    // Detectar si el mensaje contiene markdown (títulos, listas, etc.)
-    const hasMarkdown = /^#{1,6}\s|(\*|\-|\+|\d+\.)\s|\*\*|\*|_|`/.test(message);
-    
-    if (hasMarkdown) {
-        // Simple conversión de markdown a HTML
-        formattedMessage = message
-            // Headers (## Título -> <h2>Título</h2>)
-            .replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>')
-            .replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>')
-            .replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>')
-            .replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>')
-            .replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>')
-            .replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>')
-            
-            // Bold (**text** -> <strong>text</strong>)
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            
-            // Italic (*text* -> <em>text</em>)
-            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-            
-            // Code blocks (```code``` -> <pre><code>code</code></pre>)
-            .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
-            
-            // Inline code (`code` -> <code>code</code>)
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            
-            // Unordered lists
-            .replace(/^\s*[\*\-\+]\s+(.+)$/gm, '<li>$1</li>')
-            
-            // Ordered lists
-            .replace(/^\s*\d+\.\s+(.+)$/gm, '<li>$1</li>')
-            
-            // Wrap lists with <ul> or <ol> tags
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-            
-            // Paragraphs (blank lines between text -> <p>text</p>)
-            .replace(/^([^<].+)$/gm, '<p>$1</p>')
-            
-            // Fix duplicate paragraph tags
-            .replace(/<p><p>/g, '<p>')
-            .replace(/<\/p><\/p>/g, '</p>');
-    }
-    
-    const messageEl = document.createElement('div');
-    messageEl.className = 'd-flex mb-3';
-    messageEl.innerHTML = `
-        <div class="flex-shrink-0">
-            <i class="fas fa-robot fs-4 text-primary"></i>
-        </div>
-        <div class="flex-grow-1 ms-3">
-            <div class="bg-light rounded p-3">
-                <div class="markdown-content">${formattedMessage}</div>
-            </div>
-        </div>
-    `;
-    
-    chatHistory.appendChild(messageEl);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-    
-    return messageEl;
-}
-
-function appendLoadingIndicator() {
-    const chatHistory = document.getElementById('chatHistory');
-    if (!chatHistory) return null;
-    
-    const loadingEl = document.createElement('div');
-    loadingEl.className = 'd-flex mb-3';
-    loadingEl.innerHTML = `
-        <div class="flex-shrink-0">
-            <i class="fas fa-robot fs-4 text-primary"></i>
-        </div>
-        <div class="flex-grow-1 ms-3">
-            <div class="bg-light rounded p-3 d-flex align-items-center">
-                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                    <span class="visually-hidden">Pensando...</span>
-                </div>
-                <p class="mb-0">Generando respuesta...</p>
-            </div>
-        </div>
-    `;
-    
-    chatHistory.appendChild(loadingEl);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-    
-    return loadingEl;
-}
-
-// Mejorar texto con IA
-async function enhanceTextWithAI(text, enhancementType) {
-    if (!text) {
-        showToast('No hay texto para mejorar', 'error');
-        return null;
-    }
-    
-    try {
-        // Obtener estilo y nivel de detalle seleccionados
-        const style = document.getElementById('assistantStyle')?.value || 'formal';
-        
-        // Llamar a la API
-        const response = await fetch('/api/ai/enhance-text', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            },
-            body: JSON.stringify({
-                text,
-                enhancementType,
-                options: {
-                    style
-                }
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data.enhancedText;
-    } catch (error) {
-        console.error('Error mejorando texto:', error);
-        showToast('Error al mejorar el texto', 'error');
-        return null;
-    }
-}
-
-// Agregar botón para mejorar texto en campos de texto
-function addTextEnhancementButtons() {
-    // Identificar campos de texto grandes
-    const textareas = document.querySelectorAll('textarea');
-    
-    textareas.forEach(textarea => {
-        // Solo agregar si no tiene ya un botón de mejora
-        if (!textarea.nextElementSibling || !textarea.nextElementSibling.classList.contains('enhance-text-btn')) {
-            const container = document.createElement('div');
-            container.className = 'text-end mt-1 enhance-text-btn';
-            
-            const btnGroup = document.createElement('div');
-            btnGroup.className = 'btn-group btn-group-sm';
-            
-            // Botón para mejorar claridad
-            const clarityBtn = document.createElement('button');
-            clarityBtn.type = 'button';
-            clarityBtn.className = 'btn btn-outline-secondary';
-            clarityBtn.innerHTML = '<i class="fas fa-magic"></i> Mejorar claridad';
-            clarityBtn.addEventListener('click', async () => {
-                const enhancedText = await enhanceTextWithAI(textarea.value, 'improve_clarity');
-                if (enhancedText) {
-                    textarea.value = enhancedText;
-                    // Disparar evento input para actualizar cualquier vista previa
-                    textarea.dispatchEvent(new Event('input'));
-                }
-            });
-            
-            // Botón para formalizar
-            const formalBtn = document.createElement('button');
-            formalBtn.type = 'button';
-            formalBtn.className = 'btn btn-outline-secondary';
-            formalBtn.innerHTML = '<i class="fas fa-pen-fancy"></i> Formalizar';
-            formalBtn.addEventListener('click', async () => {
-                const enhancedText = await enhanceTextWithAI(textarea.value, 'formal_tone');
-                if (enhancedText) {
-                    textarea.value = enhancedText;
-                    textarea.dispatchEvent(new Event('input'));
-                }
-            });
-            
-            // Agregar botones al grupo
-            btnGroup.appendChild(clarityBtn);
-            btnGroup.appendChild(formalBtn);
-            
-            // Agregar grupo al contenedor
-            container.appendChild(btnGroup);
-            
-            // Insertar después del textarea
-            textarea.parentNode.insertBefore(container, textarea.nextSibling);
-        }
-    });
-}
