@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="<thinking>
+The email verification routes have been successfully added. Now I need to create the frontend pages for email verification.
+
+I'll create two new files:
+1. verify-email.html for the email verification page
+2. send-verification.html for requesting a new verification email
+</thinking>
+
+<create_file>
+<path>psychological-report-system/frontend/verify-email.html</path>
+<content>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Correo Electrónico</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/styles.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="card-title text-center mb-4">Verificación de Correo Electrónico</h2>
+                        <div id="verificationMessage" class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p class="mt-3">Verificando tu correo electrónico...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/main.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+
+        async function verifyEmail() {
+            try {
+                const response = await fetch(`/api/auth/verify-email?token=${token}`);
+                
+                if (response.ok) {
+                    document.getElementById('verificationMessage').innerHTML = `
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading">¡Verificación exitosa!</h4>
+                            <p>Tu correo electrónico ha sido verificado correctamente.</p>
+                            <hr>
+                            <p class="mb-0">Ahora puedes <a href="/login.html">iniciar sesión</a>.</p>
+                        </div>
+                    `;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Error al verificar el correo electrónico');
+                }
+            } catch (error) {
+                document.getElementById('verificationMessage').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Error en la verificación</h4>
+                        <p>${error.message}</p>
+                        <hr>
+                        <p class="mb-0">Por favor, solicita un nuevo enlace de verificación.</p>
+                    </div>
+                `;
+            }
+        }
+
+        verifyEmail();
+    </script>
+</body>
+</html>

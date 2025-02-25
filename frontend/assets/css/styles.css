@@ -1,0 +1,117 @@
+.nav-tabs .nav-link {
+    color: #495057;
+    border: none;
+    padding: 1rem 1.5rem;
+    transition: all 0.3s;
+}
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom: 3px solid #0d6efd;
+    font-weight: bold;
+}
+.nav-tabs .nav-link:hover {
+    border-color: transparent;
+    isolation: isolate;
+    background-color: #f8f9fa;
+}
+.tab-pane {
+    padding: 2rem;
+}
+.config-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.preview-image {
+    max-width: 200px;
+    max-height: 100px;
+    margin: 10px 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 5px;
+}
+.color-preview {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 10px;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    border: none;
+    padding: 1rem 1.5rem;
+    transition: all 0.3s;
+}
+
+.nav-tabs .nav-link.active {
+    color: #0d6efd;
+    border-bottom: 3px solid #0d6efd;
+    font-weight: bold;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: transparent;
+    isolation: isolate;
+    background-color: #f8f9fa;
+}
+
+.tab-pane {
+    padding: 2rem;
+}
+
+.config-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.preview-image {
+    max-width: 200px;
+    max-height: 100px;
+    margin: 10px 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+/* Session Warning Modal Styles */
+#sessionWarningModal .modal-header {
+    background-color: #ffc107;
+    color: #000;
+}
+
+#sessionWarningModal .modal-body {
+    font-size: 1.1rem;
+}
+
+#sessionCountdown {
+    font-weight: bold;
+    color: #dc3545;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+#sessionWarningModal .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+#sessionWarningModal .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
