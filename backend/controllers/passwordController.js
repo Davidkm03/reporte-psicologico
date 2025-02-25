@@ -1,16 +1,7 @@
 const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-
-// Configure email transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+const emailService = require('../services/emailService');
 
 // @desc    Request password reset
 // @route   POST /api/auth/forgot-password
@@ -32,22 +23,32 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
     user.resetPasswordExpires = resetTokenExpiry;
     await user.save();
 
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-    
-    const mailOptions = {
-        to: user.email,
-        from: process.env.EMAIL_USER,
-        subject: 'Password Reset Request',
-        text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n
-        Please click on the following link, or paste this into your browser to complete the process:\n\n
-        ${resetUrl}\n\n
-        If you did not request this, please ignore this email and your password will remain unchanged.\n`
-    };
+    // Send reset email using the email service
+    try {
+        const emailResult = await emailService.sendPasswordResetEmail(
+            user.email,
+            resetToken,
+            user.profile?.fullName
+        );
 
-    await transporter.sendMail(mailOptions);
-
-    res.status(200).json({ message: 'Password reset email sent' });
+        if (!emailResult.success) {
+            console.error('Failed to send password reset email:', emailResult.error);
+            res.status(500);
+            throw new Error('Error sending password reset email. Please try again later.');
+        }
+        
+        res.status(200).json({ 
+            message: 'Password reset email sent',
+            // In development, return additional information for testing
+            ...(process.env.NODE_ENV === 'development' && { 
+                debug: { token: resetToken, email: user.email } 
+            })
+        });
+    } catch (error) {
+        console.error('Error in requestPasswordReset:', error);
+        res.status(500);
+        throw new Error('Failed to process password reset request');
+    }
 });
 
 // @desc    Reset password
@@ -55,6 +56,11 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
 // @access  Public
 const resetPassword = asyncHandler(async (req, res) => {
     const { token, password } = req.body;
+
+    if (!token || !password) {
+        res.status(400);
+        throw new Error('Token and password are required');
+    }
 
     const user = await User.findOne({
         resetPasswordToken: token,
@@ -66,6 +72,7 @@ const resetPassword = asyncHandler(async (req, res) => {
         throw new Error('Password reset token is invalid or has expired');
     }
 
+    // Set new password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
@@ -73,20 +80,65 @@ const resetPassword = asyncHandler(async (req, res) => {
     await user.save();
 
     // Send confirmation email
-    const mailOptions = {
-        to: user.email,
-        from: process.env.EMAIL_USER,
-        subject: 'Your password has been changed',
-        text: `Hello,\n\n
-        This is a confirmation that the password for your account ${user.email} has just been changed.\n`
-    };
-
-    await transporter.sendMail(mailOptions);
+    try {
+        await emailService.sendPasswordChangedEmail(
+            user.email,
+            user.profile?.fullName
+        );
+    } catch (error) {
+        // Log the error but continue with the response
+        console.error('Error sending password changed confirmation email:', error);
+    }
 
     res.status(200).json({ message: 'Password successfully reset' });
 });
 
+// @desc    Change password (when logged in)
+// @route   POST /api/auth/change-password
+// @access  Private
+const changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Validate input
+    if (!currentPassword || !newPassword) {
+        res.status(400);
+        throw new Error('Current password and new password are required');
+    }
+    
+    // Get user
+    const user = await User.findById(req.user._id);
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+    
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+        res.status(401);
+        throw new Error('Current password is incorrect');
+    }
+    
+    // Set new password
+    user.password = newPassword;
+    await user.save();
+    
+    // Send confirmation email
+    try {
+        await emailService.sendPasswordChangedEmail(
+            user.email,
+            user.profile?.fullName
+        );
+    } catch (error) {
+        // Log the error but continue with the response
+        console.error('Error sending password changed confirmation email:', error);
+    }
+    
+    res.status(200).json({ message: 'Password successfully changed' });
+});
+
 module.exports = {
     requestPasswordReset,
-    resetPassword
+    resetPassword,
+    changePassword
 };

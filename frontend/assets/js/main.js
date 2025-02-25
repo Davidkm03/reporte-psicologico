@@ -1,6 +1,6 @@
-// frontend/js/main.js
+// frontend/assets/js/main.js
 
-// Configuration object to store user preferences
+// Configuración global
 const config = {
     logo: null,
     header: null,
@@ -11,11 +11,25 @@ const config = {
     headerFont: 'Arial',
     bodyFont: 'Arial',
     enableWatermark: false,
-    templates: [], // Array para almacenar plantillas
-    userId: null, // Para identificar al usuario autenticado
+    templates: [],
+    userId: null
 };
 
-// Function to handle image preview
+// Estado de la aplicación
+const state = {
+    selectedTemplateId: null,
+    currentReport: null,
+    editingTemplate: null,
+    lastSaved: null
+};
+
+// Función para manejo de errores
+function handleError(error, message = 'Se produjo un error') {
+    console.error(error);
+    showToast(message + ': ' + (error.message || 'Error desconocido'), 'error');
+}
+
+// Funciones para manejo de imágenes
 function handleImagePreview(input, previewId) {
     const preview = document.getElementById(previewId);
     const file = input.files[0];
@@ -29,89 +43,155 @@ function handleImagePreview(input, previewId) {
             config[key] = e.target.result;
             saveConfig();
             updatePreview();
-            syncConfigWithBackend(); // Sincroniza con el backend
         };
         reader.readAsDataURL(file);
     }
 }
 
-// Function to handle color changes
+// Función para limpiar una imagen
+function clearImage(inputId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(inputId.replace('Input', 'Preview'));
+    
+    if (input) input.value = '';
+    if (preview) {
+        preview.src = '';
+        preview.classList.add('d-none');
+    }
+    
+    const key = inputId.replace('Input', '').toLowerCase();
+    config[key] = null;
+    saveConfig();
+    updatePreview();
+}
+
+// Funciones para manejo de colores
 function handleColorChange(colorId, targetClass) {
     const colorInput = document.getElementById(colorId);
-    colorInput.addEventListener('input', function(e) {
-        document.querySelectorAll(targetClass).forEach(element => {
-            element.style.color = e.target.value;
+    const colorText = document.querySelector(`[data-color-input="${colorId}"]`);
+    
+    if (colorInput) {
+        colorInput.addEventListener('input', function(e) {
+            const color = e.target.value;
+            
+            // Actualizar el campo de texto
+            if (colorText) colorText.value = color;
+            
+            // Actualizar elementos visuales
+            document.querySelectorAll(targetClass).forEach(element => {
+                element.style.color = color;
+            });
+            
+            // Actualizar configuración
+            config[colorId] = color;
+            saveConfig();
+            updatePreview();
         });
-        config[colorId] = e.target.value;
-        saveConfig();
-        updatePreview();
-        syncConfigWithBackend();
-    });
+    }
+    
+    // Sincronizar cambios desde el campo de texto
+    if (colorText) {
+        colorText.addEventListener('input', function(e) {
+            const color = e.target.value;
+            if (colorInput) colorInput.value = color;
+            
+            // Actualizar elementos visuales
+            document.querySelectorAll(targetClass).forEach(element => {
+                element.style.color = color;
+            });
+            
+            // Actualizar configuración
+            config[colorId] = color;
+            saveConfig();
+            updatePreview();
+        });
+    }
 }
 
-// Function to handle font changes
+// Función para manejo de fuentes
 function handleFontChange(fontId, targetClass) {
     const fontSelect = document.getElementById(fontId);
-    fontSelect.addEventListener('change', function(e) {
-        document.querySelectorAll(targetClass).forEach(element => {
-            element.style.fontFamily = e.target.value;
+    if (fontSelect) {
+        fontSelect.addEventListener('change', function(e) {
+            document.querySelectorAll(targetClass).forEach(element => {
+                element.style.fontFamily = e.target.value;
+            });
+            config[fontId] = e.target.value;
+            saveConfig();
+            updatePreview();
         });
-        config[fontId] = e.target.value;
-        saveConfig();
-        updatePreview();
-        syncConfigWithBackend();
-    });
+    }
 }
 
-// Function to handle watermark toggle
+// Función para manejar checkbox de marca de agua
 function handleWatermarkToggle() {
     const watermarkToggle = document.getElementById('enableWatermark');
-    watermarkToggle.addEventListener('change', function(e) {
-        config.enableWatermark = e.target.checked;
-        saveConfig();
-        syncConfigWithBackend();
-    });
+    if (watermarkToggle) {
+        watermarkToggle.addEventListener('change', function(e) {
+            config.enableWatermark = e.target.checked;
+            saveConfig();
+        });
+    }
 }
 
-// Update preview panel dynamically
+// Actualizar panel de vista previa
 function updatePreview() {
     const preview = document.getElementById('stylePreview');
+    if (!preview) return;
+    
     const title = preview.querySelector('.preview-title');
     const text = preview.querySelector('.preview-text');
-    const logo = preview.querySelector('img');
-
-    title.style.color = config.primaryColor;
-    title.style.fontFamily = config.headerFont;
-    text.style.color = config.secondaryColor;
-    text.style.fontFamily = config.bodyFont;
+    const logo = preview.querySelector('.preview-logo');
     
-    if (config.logo) {
-        logo.src = config.logo;
-        logo.classList.remove('d-none');
-    } else {
-        logo.classList.add('d-none');
+    if (title) {
+        title.style.color = config.primaryColor;
+        title.style.fontFamily = config.headerFont;
+    }
+    
+    if (text) {
+        text.style.color = config.secondaryColor;
+        text.style.fontFamily = config.bodyFont;
+    }
+    
+    if (logo) {
+        if (config.logo) {
+            logo.src = config.logo;
+            logo.classList.remove('d-none');
+        } else {
+            logo.src = '/static/images/placeholder-logo.png';
+        }
     }
 }
 
-// Save configuration to localStorage
+// Guardar configuración en localStorage
 function saveConfig() {
-    localStorage.setItem('reportConfig', JSON.stringify(config));
-    showToast('Configuración guardada localmente', 'success');
-}
-
-// Load configuration from localStorage
-function loadConfig() {
-    const savedConfig = localStorage.getItem('reportConfig');
-    if (savedConfig) {
-        Object.assign(config, JSON.parse(savedConfig));
-        applyConfig();
+    try {
+        localStorage.setItem('reportConfig', JSON.stringify(config));
+        syncConfigWithBackend();
+    } catch (error) {
+        handleError(error, 'Error al guardar configuración local');
     }
-    syncConfigWithBackend(); // Sincroniza con el backend al cargar
 }
 
-// Apply loaded configuration to the UI
+// Cargar configuración desde localStorage
+function loadConfig() {
+    try {
+        const savedConfig = localStorage.getItem('reportConfig');
+        if (savedConfig) {
+            Object.assign(config, JSON.parse(savedConfig));
+            applyConfig();
+        }
+        
+        // Cargar configuración desde backend
+        loadConfigFromBackend();
+    } catch (error) {
+        handleError(error, 'Error al cargar configuración local');
+    }
+}
+
+// Aplicar configuración a la interfaz
 function applyConfig() {
-    // Images
+    // Imágenes
     ['logo', 'header', 'footer', 'watermark'].forEach(item => {
         if (config[item]) {
             const preview = document.getElementById(`${item}Preview`);
@@ -122,113 +202,109 @@ function applyConfig() {
         }
     });
 
-    // Colors
-    document.getElementById('primaryColor').value = config.primaryColor;
-    document.querySelectorAll('.preview-title').forEach(el => el.style.color = config.primaryColor);
-    document.getElementById('secondaryColor').value = config.secondaryColor;
-    document.querySelectorAll('.preview-text').forEach(el => el.style.color = config.secondaryColor);
+    // Colores
+    const primaryColorInput = document.getElementById('primaryColor');
+    const primaryColorText = document.querySelector('[data-color-input="primaryColor"]');
+    if (primaryColorInput) primaryColorInput.value = config.primaryColor;
+    if (primaryColorText) primaryColorText.value = config.primaryColor;
+    
+    const secondaryColorInput = document.getElementById('secondaryColor');
+    const secondaryColorText = document.querySelector('[data-color-input="secondaryColor"]');
+    if (secondaryColorInput) secondaryColorInput.value = config.secondaryColor;
+    if (secondaryColorText) secondaryColorText.value = config.secondaryColor;
 
-    // Fonts
-    document.getElementById('headerFont').value = config.headerFont;
-    document.querySelectorAll('.preview-title').forEach(el => el.style.fontFamily = config.headerFont);
-    document.getElementById('bodyFont').value = config.bodyFont;
-    document.querySelectorAll('.preview-text').forEach(el => el.style.fontFamily = config.bodyFont);
+    // Fuentes
+    const headerFontInput = document.getElementById('headerFont');
+    if (headerFontInput) headerFontInput.value = config.headerFont;
+    
+    const bodyFontInput = document.getElementById('bodyFont');
+    if (bodyFontInput) bodyFontInput.value = config.bodyFont;
 
-    // Watermark
-    document.getElementById('enableWatermark').checked = config.enableWatermark;
+    // Marca de agua
+    const enableWatermarkInput = document.getElementById('enableWatermark');
+    if (enableWatermarkInput) enableWatermarkInput.checked = config.enableWatermark;
+    
+    // Actualizar vista previa
     updatePreview();
 }
 
-// Show toast notifications
+// Mostrar notificaciones
 function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-bg-${type} border-0 position-fixed bottom-0 end-0 m-3`;
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
-    document.body.appendChild(toast);
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// Synchronize configuration with backend
-async function syncConfigWithBackend() {
-    try {
-        const token = localStorage.getItem('authToken'); // Suponiendo que usas un token de autenticación
-        const response = await fetch('/api/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(config)
-        });
-        if (!response.ok) throw new Error('Error al sincronizar configuración');
-        showToast('Configuración sincronizada con el servidor', 'success');
-    } catch (error) {
-        showToast(`Error: ${error.message}`, 'danger');
-    }
-}
-
-// Load user-specific config from backend
-async function loadConfigFromBackend() {
-    try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch('/api/config', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        if (!response.ok) throw new Error('Error al cargar configuración');
-        const data = await response.json();
-        Object.assign(config, data);
-        applyConfig();
-        saveConfig();
-    } catch (error) {
-        showToast(`Error: ${error.message}`, 'danger');
-    }
-}
-
-// Template management
-function handleTemplates() {
-    const templateList = document.querySelector('#templates .list-group');
-    const newTemplateBtn = document.querySelector('#templates .btn-primary');
+    const toastEl = document.getElementById('notificationToast');
+    const toastHeader = document.getElementById('toastHeader');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastMessage = document.getElementById('toastMessage');
     
-    newTemplateBtn.addEventListener('click', async () => {
-        const templateName = prompt('Nombre de la nueva plantilla:');
-        if (templateName) {
-            const newTemplate = {
-                name: templateName,
-                category: 'General',
-                sections: []
-            };
-            try {
-                const token = localStorage.getItem('authToken');
-                const response = await fetch('/api/templates', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(newTemplate)
-                });
-                if (!response.ok) throw new Error('Error al crear plantilla');
-                const createdTemplate = await response.json();
-                config.templates.push(createdTemplate);
-                saveConfig();
-                renderTemplates();
-                showToast('Plantilla creada exitosamente', 'success');
-            } catch (error) {
-                showToast(`Error: ${error.message}`, 'danger');
-            }
-        }
-    });
+    if (!toastEl || !toastHeader || !toastTitle || !toastMessage) return;
+    
+    // Configurar tipo de toast
+    if (type === 'error') {
+        toastHeader.className = 'toast-header bg-danger text-white';
+        toastTitle.textContent = 'Error';
+    } else if (type === 'success') {
+        toastHeader.className = 'toast-header bg-success text-white';
+        toastTitle.textContent = 'Éxito';
+    } else {
+        toastHeader.className = 'toast-header bg-info text-white';
+        toastTitle.textContent = 'Información';
+    }
+    
+    // Establecer mensaje
+    toastMessage.textContent = message;
+    
+    // Mostrar toast
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+}
 
-    async function renderTemplates() {
+// API de backend
+const api = {
+    // Configuraciones
+    async saveConfig() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ config })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al sincronizar configuración');
+            return null;
+        }
+    },
+    
+    async loadConfig() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/config/load', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al cargar configuración remota');
+            return null;
+        }
+    },
+    
+    // Plantillas
+    async getTemplates() {
         try {
             const token = localStorage.getItem('authToken');
             const response = await fetch('/api/templates', {
@@ -236,196 +312,1276 @@ function handleTemplates() {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            if (!response.ok) throw new Error('Error al cargar plantillas');
-            config.templates = await response.json();
-            templateList.innerHTML = '';
-            config.templates.forEach((template, index) => {
-                const item = document.createElement('a');
-                item.href = '#';
-                item.className = 'list-group-item list-group-item-action';
-                item.innerHTML = `
-                    <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1">${template.name}</h6>
-                        <small><i class="far fa-star"></i></small>
-                    </div>
-                    <small class="text-muted">${template.category}</small>
-                `;
-                item.addEventListener('click', () => loadTemplateEditor(index));
-                templateList.appendChild(item);
-            });
-        } catch (error) {
-            showToast(`Error: ${error.message}`, 'danger');
-        }
-    }
-
-    function loadTemplateEditor(index) {
-        const template = config.templates[index];
-        document.querySelector('#templates input.form-control').value = template.name;
-        document.querySelector('#templates select.form-select').value = template.category;
-    }
-
-    renderTemplates();
-}
-
-// Report generation
-function handleReport() {
-    const saveBtn = document.querySelector('#report .btn-success');
-    saveBtn.addEventListener('click', async () => {
-        const reportData = {
-            patientName: document.querySelector('#report input[placeholder="Nombre completo"]')?.value,
-            age: document.querySelector('#report input[type="number"]')?.value,
-            date: document.querySelector('#report input[type="date"]')?.value,
-            reason: document.querySelector('#report textarea')?.value,
-        };
-        try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch('/api/reports', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(reportData)
-            });
-            if (!response.ok) throw new Error('Error al guardar informe');
-            showToast('Informe guardado exitosamente', 'success');
-        } catch (error) {
-            showToast(`Error: ${error.message}`, 'danger');
-        }
-    });
-}
-
-// AI Assistant simulation
-function handleAIAssistant() {
-    const chatInput = document.querySelector('#ai-assistant .input-group input');
-    const chatSend = document.querySelector('#ai-assistant .input-group button');
-    const chatContainer = document.querySelector('#ai-assistant .border.rounded.p-3');
-
-    chatSend.addEventListener('click', async () => {
-        const message = chatInput.value.trim();
-        if (!message) return;
-
-        const userMsg = `
-            <div class="d-flex mb-3 flex-row-reverse">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-user fs-4 text-secondary"></i>
-                </div>
-                <div class="flex-grow-1 me-3">
-                    <div class="bg-primary text-white rounded p-3">
-                        <p class="mb-0">${message}</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        chatContainer.insertAdjacentHTML('beforeend', userMsg);
-
-        try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch('/api/ai/assist', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ message })
-            });
-            if (!response.ok) throw new Error('Error al obtener respuesta de IA');
-            const aiData = await response.json();
-
-            setTimeout(() => {
-                const aiResponse = `
-                    <div class="d-flex mb-3">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-robot fs-4 text-primary"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <div class="bg-light rounded p-3">
-                                <p class="mb-0">${aiData.response || 'Procesando: Sugerencia basada en tu mensaje.'}</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                chatContainer.insertAdjacentHTML('beforeend', aiResponse);
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            }, 1000);
-        } catch (error) {
-            showToast(`Error: ${error.message}`, 'danger');
-        }
-
-        chatInput.value = '';
-    });
-}
-
-// Settings management
-function handleSettings() {
-    const saveSettingsBtn = document.querySelector('#settings .btn-success');
-    if (saveSettingsBtn) {
-        saveSettingsBtn.addEventListener('click', async () => {
-            const settings = {
-                professionalName: document.querySelector('#settings input[placeholder="Nombre Completo"]')?.value,
-                license: document.querySelector('#settings input[placeholder="Número de Licencia"]')?.value,
-            };
-            try {
-                const token = localStorage.getItem('authToken');
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(settings)
-                });
-                if (!response.ok) throw new Error('Error al guardar ajustes');
-                showToast('Configuración de ajustes guardada', 'success');
-            } catch (error) {
-                showToast(`Error: ${error.message}`, 'danger');
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
             }
-        });
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al cargar plantillas');
+            return [];
+        }
+    },
+    
+    async getTemplateById(id) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/templates/${id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al cargar plantilla');
+            return null;
+        }
+    },
+    
+    async createTemplate(templateData) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/templates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(templateData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al crear plantilla');
+            return null;
+        }
+    },
+    
+    async updateTemplate(id, templateData) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/templates/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(templateData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al actualizar plantilla');
+            return null;
+        }
+    },
+    
+    async deleteTemplate(id) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/templates/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            handleError(error, 'Error al eliminar plantilla');
+            return null;
+        }
+    }
+};
+
+// Sincronizar configuración con el backend
+async function syncConfigWithBackend() {
+    const result = await api.saveConfig();
+    if (result) {
+        state.lastSaved = new Date();
     }
 }
 
-// Initialize event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    // Check authentication and load user data
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-        window.location.href = '/auth/login'; // Redirige si no hay token
+// Cargar configuración desde el backend
+async function loadConfigFromBackend() {
+    const result = await api.loadConfig();
+    if (result && result.config) {
+        // Fusionar con configuración local, priorizando la del backend
+        Object.assign(config, result.config);
+        applyConfig();
+        saveConfig();
+    }
+}
+
+// Funciones para la gestión de plantillas
+async function loadTemplates() {
+    try {
+        const templates = await api.getTemplates();
+        if (templates && templates.length > 0) {
+            config.templates = templates;
+            renderTemplateList();
+            populateReportTemplateDropdown();
+        } else {
+            const templateList = document.getElementById('templateList');
+            if (templateList) {
+                templateList.innerHTML = '<div class="text-center text-muted py-4">No hay plantillas disponibles</div>';
+            }
+        }
+    } catch (error) {
+        handleError(error, 'Error al cargar plantillas');
+    }
+}
+
+function renderTemplateList() {
+    const templateList = document.getElementById('templateList');
+    if (!templateList) return;
+    
+    templateList.innerHTML = '';
+    
+    if (config.templates.length === 0) {
+        templateList.innerHTML = '<div class="text-center text-muted py-4">No hay plantillas disponibles</div>';
         return;
     }
+    
+    config.templates.forEach(template => {
+        const item = document.createElement('a');
+        item.href = '#';
+        item.className = 'list-group-item list-group-item-action';
+        item.dataset.id = template._id;
+        
+        item.innerHTML = `
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">${template.name}</h6>
+                <small><i class="${template.isStarred ? 'fas' : 'far'} fa-star"></i></small>
+            </div>
+            <small class="text-muted">${template.category}</small>
+        `;
+        
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            loadTemplateEditor(template._id);
+        });
+        
+        templateList.appendChild(item);
+    });
+}
 
-    loadConfigFromBackend(); // Cargar configuración desde el backend
-
-    // Personalization tab
-    ['logoInput', 'headerInput', 'footerInput', 'watermarkInput'].forEach(id => {
-        const input = document.getElementById(id);
-        if (input) {
-            input.addEventListener('change', () => handleImagePreview(input, id.replace('Input', 'Preview')));
+function populateReportTemplateDropdown() {
+    const select = document.getElementById('reportTemplate');
+    if (!select) return;
+    
+    // Limpiar opciones existentes
+    select.innerHTML = '<option value="">Seleccione una plantilla</option>';
+    
+    // Agregar plantillas como opciones
+    config.templates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template._id;
+        option.textContent = template.name;
+        select.appendChild(option);
+    });
+    
+    // Evento para cargar el formulario cuando se cambia la plantilla
+    select.addEventListener('change', () => {
+        const templateId = select.value;
+        if (templateId) {
+            loadReportForm(templateId);
+        } else {
+            clearReportForm();
         }
     });
+}
 
-    handleColorChange('primaryColor', '.preview-title');
-    handleColorChange('secondaryColor', '.preview-text');
-    handleFontChange('headerFont', '.preview-title');
-    handleFontChange('bodyFont', '.preview-text');
-    handleWatermarkToggle();
+async function loadTemplateEditor(templateId) {
+    try {
+        // Marcar la plantilla seleccionada en la lista
+        document.querySelectorAll('#templateList a').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.id === templateId) {
+                item.classList.add('active');
+            }
+        });
+        
+        // Cargar datos de la plantilla
+        const template = await api.getTemplateById(templateId);
+        if (template) {
+            state.editingTemplate = template;
+            
+            // Llenar el formulario con los datos de la plantilla
+            document.getElementById('templateName').value = template.name;
+            document.getElementById('templateCategory').value = template.category;
+            document.getElementById('templateDescription').value = template.description || '';
+            
+            // Renderizar secciones
+            renderTemplateSections(template.sections);
+        }
+    } catch (error) {
+        handleError(error, 'Error al cargar la plantilla');
+    }
+}
 
-    // Clear image buttons
-    document.querySelectorAll('.btn-outline-secondary i.fa-trash').forEach(btn => {
+function renderTemplateSections(sections) {
+    const container = document.getElementById('templateSections');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (!sections || sections.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-3">No hay secciones definidas</div>';
+        return;
+    }
+    
+    sections.forEach((section, index) => {
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'border rounded p-3 mb-3';
+        sectionEl.dataset.index = index;
+        
+        let optionsHtml = '';
+        if (section.options && section.options.length > 0) {
+            optionsHtml = `
+                <div class="small text-muted mt-2">
+                    Opciones: ${section.options.join(', ')}
+                </div>
+            `;
+        }
+        
+        sectionEl.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">
+                    <i class="fas fa-grip-vertical text-muted me-2 section-handle"></i>
+                    ${section.name}
+                    ${section.required ? '<span class="text-danger">*</span>' : ''}
+                </h6>
+                <div>
+                    <span class="badge bg-secondary me-2">${getTypeLabel(section.type)}</span>
+                    <button class="btn btn-sm btn-outline-secondary me-2 edit-section-btn" data-index="${index}">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger delete-section-btn" data-index="${index}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            ${optionsHtml}
+        `;
+        
+        // Evento para editar la sección
+        sectionEl.querySelector('.edit-section-btn').addEventListener('click', () => {
+            editSection(index);
+        });
+        
+        // Evento para eliminar la sección
+        sectionEl.querySelector('.delete-section-btn').addEventListener('click', () => {
+            if (confirm('¿Está seguro de eliminar esta sección?')) {
+                state.editingTemplate.sections.splice(index, 1);
+                renderTemplateSections(state.editingTemplate.sections);
+            }
+        });
+        
+        container.appendChild(sectionEl);
+    });
+    
+    // Hacer que las secciones sean ordenables
+    enableSectionSorting();
+}
+
+function getTypeLabel(type) {
+    const types = {
+        'text': 'Texto',
+        'checkbox': 'Checkbox',
+        'radio': 'Radio',
+        'select': 'Desplegable'
+    };
+    return types[type] || type;
+}
+
+function enableSectionSorting() {
+    // Aquí se implementaría la funcionalidad de arrastrar y soltar
+    // Se puede usar bibliotecas como SortableJS
+}
+
+function editSection(index) {
+    const section = state.editingTemplate.sections[index];
+    if (!section) return;
+    
+    // Abrir modal de edición con los datos de la sección
+    const modal = new bootstrap.Modal(document.getElementById('newSectionModal'));
+    
+    document.getElementById('sectionName').value = section.name;
+    document.getElementById('sectionType').value = section.type;
+    document.getElementById('sectionRequired').checked = section.required;
+    
+    // Manejar opciones si es necesario
+    const optionsContainer = document.getElementById('optionsContainer');
+    const optionsList = document.getElementById('optionsList');
+    
+    if (section.type === 'checkbox' || section.type === 'radio' || section.type === 'select') {
+        optionsContainer.style.display = 'block';
+        optionsList.innerHTML = '';
+        
+        if (section.options && section.options.length > 0) {
+            section.options.forEach(option => {
+                addOptionInput(option);
+            });
+        } else {
+            addOptionInput();
+        }
+    } else {
+        optionsContainer.style.display = 'none';
+    }
+    
+    // Cambiar el comportamiento del botón guardar para actualizar en lugar de crear
+    const saveBtn = document.getElementById('saveNewSectionBtn');
+    const originalOnClick = saveBtn.onclick;
+    
+    saveBtn.onclick = () => {
+        const name = document.getElementById('sectionName').value;
+        const type = document.getElementById('sectionType').value;
+        const required = document.getElementById('sectionRequired').checked;
+        
+        // Obtener opciones si es necesario
+        let options = [];
+        if (type === 'checkbox' || type === 'radio' || type === 'select') {
+            document.querySelectorAll('.option-input').forEach(input => {
+                if (input.value.trim()) {
+                    options.push(input.value.trim());
+                }
+            });
+        }
+        
+        // Actualizar la sección
+        state.editingTemplate.sections[index] = {
+            name,
+            type,
+            required,
+            options
+        };
+        
+        // Cerrar el modal y renderizar las secciones
+        modal.hide();
+        renderTemplateSections(state.editingTemplate.sections);
+        
+        // Restaurar el comportamiento original del botón
+        saveBtn.onclick = originalOnClick;
+    };
+    
+    modal.show();
+}
+
+function addOptionInput(value = '') {
+    const optionsList = document.getElementById('optionsList');
+    if (!optionsList) return;
+    
+    const optionDiv = document.createElement('div');
+    optionDiv.className = 'input-group mb-2';
+    optionDiv.innerHTML = `
+        <input type="text" class="form-control option-input" placeholder="Opción" value="${value}">
+        <button class="btn btn-outline-danger remove-option-btn" type="button">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Evento para eliminar la opción
+    optionDiv.querySelector('.remove-option-btn').addEventListener('click', () => {
+        optionDiv.remove();
+    });
+    
+    optionsList.appendChild(optionDiv);
+}
+
+async function createNewTemplate() {
+    const newTemplate = {
+        name: 'Nueva Plantilla',
+        category: 'Adultos',
+        sections: [],
+        description: ''
+    };
+    
+    try {
+        const created = await api.createTemplate(newTemplate);
+        if (created) {
+            // Actualizar la lista de plantillas
+            await loadTemplates();
+            
+            // Seleccionar la nueva plantilla
+            loadTemplateEditor(created._id);
+            
+            showToast('Plantilla creada correctamente', 'success');
+        }
+    } catch (error) {
+        handleError(error, 'Error al crear nueva plantilla');
+    }
+}
+
+async function saveTemplate() {
+    if (!state.editingTemplate) return;
+    
+    // Actualizar los datos del formulario en el objeto de plantilla
+    state.editingTemplate.name = document.getElementById('templateName').value;
+    state.editingTemplate.category = document.getElementById('templateCategory').value;
+    state.editingTemplate.description = document.getElementById('templateDescription').value;
+    
+    try {
+        const updated = await api.updateTemplate(state.editingTemplate._id, state.editingTemplate);
+        if (updated) {
+            // Actualizar la lista de plantillas
+            await loadTemplates();
+            
+            showToast('Plantilla guardada correctamente', 'success');
+        }
+    } catch (error) {
+        handleError(error, 'Error al guardar plantilla');
+    }
+}
+
+async function duplicateTemplate() {
+    if (!state.editingTemplate) return;
+    
+    const duplicate = {
+        ...state.editingTemplate,
+        name: `${state.editingTemplate.name} (Copia)`,
+        _id: undefined // Eliminar el ID para crear uno nuevo
+    };
+    
+    try {
+        const created = await api.createTemplate(duplicate);
+        if (created) {
+            // Actualizar la lista de plantillas
+            await loadTemplates();
+            
+            // Seleccionar la nueva plantilla
+            loadTemplateEditor(created._id);
+            
+            showToast('Plantilla duplicada correctamente', 'success');
+        }
+    } catch (error) {
+        handleError(error, 'Error al duplicar plantilla');
+    }
+}
+
+// Funciones para el manejo de informes
+function loadReportForm(templateId) {
+    const template = config.templates.find(t => t._id === templateId);
+    if (!template) return;
+    
+    state.selectedTemplateId = templateId;
+    
+    const container = document.getElementById('reportFormContent');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Información del paciente
+    const patientInfo = document.createElement('div');
+    patientInfo.className = 'mb-4';
+    patientInfo.innerHTML = `
+        <h5 class="mb-3">Información del Paciente</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Nombre completo</label>
+                <input type="text" class="form-control" id="patientName" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Edad</label>
+                <input type="number" class="form-control" id="patientAge">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Fecha</label>
+                <input type="date" class="form-control" id="reportDate" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Documento de Identidad</label>
+                <input type="text" class="form-control" id="patientId">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input type="tel" class="form-control" id="patientPhone">
+            </div>
+        </div>
+    `;
+    container.appendChild(patientInfo);
+    
+    // Secciones de la plantilla
+    if (template.sections && template.sections.length > 0) {
+        template.sections.forEach((section, index) => {
+            const sectionEl = document.createElement('div');
+            sectionEl.className = 'mb-4';
+            sectionEl.innerHTML = `
+                <h5 class="mb-3">${section.name}${section.required ? ' <span class="text-danger">*</span>' : ''}</h5>
+            `;
+            
+            const content = document.createElement('div');
+            
+            switch (section.type) {
+                case 'text':
+                    content.innerHTML = `
+                        <textarea class="form-control" rows="3" id="section_${index}" ${section.required ? 'required' : ''}></textarea>
+                    `;
+                    break;
+                    
+                case 'checkbox':
+                    content.className = 'row g-2';
+                    if (section.options && section.options.length > 0) {
+                        section.options.forEach((option, optIndex) => {
+                            content.innerHTML += `
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="section_${index}_opt_${optIndex}">
+                                        <label class="form-check-label" for="section_${index}_opt_${optIndex}">${option}</label>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    break;
+                    
+                case 'radio':
+                    content.className = 'mb-3';
+                    if (section.options && section.options.length > 0) {
+                        section.options.forEach((option, optIndex) => {
+                            content.innerHTML += `
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="section_${index}" id="section_${index}_opt_${optIndex}" value="${option}" ${section.required && optIndex === 0 ? 'required' : ''}>
+                                    <label class="form-check-label" for="section_${index}_opt_${optIndex}">${option}</label>
+                                </div>
+                            `;
+                        });
+                    }
+                    break;
+                    
+                case 'select':
+                    content.innerHTML = `
+                        <select class="form-select" id="section_${index}" ${section.required ? 'required' : ''}>
+                            <option value="">Seleccione una opción</option>
+                            ${section.options.map(option => `<option value="${option}">${option}</option>`).join('')}
+                        </select>
+                    `;
+                    break;
+            }
+            
+            sectionEl.appendChild(content);
+            container.appendChild(sectionEl);
+        });
+    }
+    
+    // Profesional
+    const professionalInfo = document.createElement('div');
+    professionalInfo.className = 'mb-4';
+    professionalInfo.innerHTML = `
+        <h5 class="mb-3">Información del Profesional</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Nombre del Profesional</label>
+                <input type="text" class="form-control" id="professionalName" value="${getUserProfile()?.profile?.fullName || ''}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Número de Licencia</label>
+                <input type="text" class="form-control" id="professionalLicense" value="${getUserProfile()?.profile?.licenseNumber || ''}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Especialidad</label>
+                <input type="text" class="form-control" id="professionalSpecialty" value="${getUserProfile()?.profile?.specialty || ''}">
+            </div>
+        </div>
+    `;
+    container.appendChild(professionalInfo);
+    
+    // Actualizar vista previa
+    updateReportPreview();
+    
+    // Agregar evento a los campos para actualizar la vista previa
+    container.querySelectorAll('input, textarea, select').forEach(el => {
+        el.addEventListener('input', updateReportPreview);
+    });
+}
+
+function clearReportForm() {
+    const container = document.getElementById('reportFormContent');
+    if (container) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <p class="text-muted">Seleccione una plantilla para comenzar</p>
+            </div>
+        `;
+    }
+    
+    state.selectedTemplateId = null;
+    state.currentReport = null;
+    
+    // Limpiar vista previa
+    const previewPanel = document.getElementById('reportPreviewPanel');
+    if (previewPanel) {
+        previewPanel.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-file-alt fa-3x mb-3"></i>
+                <p>La vista previa se actualizará automáticamente mientras escribes</p>
+            </div>
+        `;
+    }
+}
+
+function updateReportPreview() {
+    const previewPanel = document.getElementById('reportPreviewPanel');
+    if (!previewPanel) return;
+    
+    // Si no hay plantilla seleccionada
+    if (!state.selectedTemplateId) {
+        previewPanel.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-file-alt fa-3x mb-3"></i>
+                <p>La vista previa se actualizará automáticamente mientras escribes</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Obtener la plantilla seleccionada
+    const template = config.templates.find(t => t._id === state.selectedTemplateId);
+    if (!template) return;
+    
+    // Crear la vista previa
+    const preview = document.createElement('div');
+    preview.className = 'report-preview';
+    
+    // Encabezado
+    preview.innerHTML = `
+        <div class="text-center mb-4">
+            ${config.logo ? `<img src="${config.logo}" alt="Logo" style="max-height: 100px; max-width: 200px;">` : ''}
+            <h1 style="color: ${config.primaryColor}; font-family: ${config.headerFont};">${template.name}</h1>
+        </div>
+    `;
+    
+    // Información del paciente
+    const patientName = document.getElementById('patientName')?.value || 'Nombre del Paciente';
+    const patientAge = document.getElementById('patientAge')?.value || '';
+    const reportDate = document.getElementById('reportDate')?.value ? new Date(document.getElementById('reportDate').value).toLocaleDateString() : new Date().toLocaleDateString();
+    
+    preview.innerHTML += `
+        <div class="mb-4">
+            <h4 style="color: ${config.primaryColor}; font-family: ${config.headerFont};">Información del Paciente</h4>
+            <p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};"><strong>Nombre:</strong> ${patientName}</p>
+            ${patientAge ? `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};"><strong>Edad:</strong> ${patientAge} años</p>` : ''}
+            <p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};"><strong>Fecha:</strong> ${reportDate}</p>
+        </div>
+    `;
+    
+    // Secciones de la plantilla
+    if (template.sections && template.sections.length > 0) {
+        template.sections.forEach((section, index) => {
+            let content = '';
+            
+            switch (section.type) {
+                case 'text':
+                    const textValue = document.getElementById(`section_${index}`)?.value || '';
+                    content = `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">${textValue || '(Sin datos)'}</p>`;
+                    break;
+                    
+                case 'checkbox':
+                    const checkedOptions = [];
+                    if (section.options && section.options.length > 0) {
+                        section.options.forEach((option, optIndex) => {
+                            const isChecked = document.getElementById(`section_${index}_opt_${optIndex}`)?.checked;
+                            if (isChecked) {
+                                checkedOptions.push(option);
+                            }
+                        });
+                    }
+                    content = `
+                        <ul style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">
+                            ${checkedOptions.length > 0 
+                                ? checkedOptions.map(opt => `<li>${opt}</li>`).join('') 
+                                : '<li>(Sin selección)</li>'}
+                        </ul>
+                    `;
+                    break;
+                    
+                case 'radio':
+                    const selectedOption = document.querySelector(`input[name="section_${index}"]:checked`)?.value;
+                    content = `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">${selectedOption || '(Sin selección)'}</p>`;
+                    break;
+                    
+                case 'select':
+                    const selectValue = document.getElementById(`section_${index}`)?.value;
+                    content = `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">${selectValue || '(Sin selección)'}</p>`;
+                    break;
+            }
+            
+            preview.innerHTML += `
+                <div class="mb-3">
+                    <h4 style="color: ${config.primaryColor}; font-family: ${config.headerFont};">${section.name}</h4>
+                    ${content}
+                </div>
+            `;
+        });
+    }
+    
+    // Información del profesional
+    const professionalName = document.getElementById('professionalName')?.value || 'Nombre del Profesional';
+    const professionalLicense = document.getElementById('professionalLicense')?.value || '';
+    const professionalSpecialty = document.getElementById('professionalSpecialty')?.value || '';
+    
+    preview.innerHTML += `
+        <div class="mt-5">
+            <div style="border-top: 1px solid #dee2e6; padding-top: 20px;">
+                <p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};"><strong>${professionalName}</strong></p>
+                ${professionalLicense ? `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">Licencia: ${professionalLicense}</p>` : ''}
+                ${professionalSpecialty ? `<p style="font-family: ${config.bodyFont}; color: ${config.secondaryColor};">Especialidad: ${professionalSpecialty}</p>` : ''}
+            </div>
+        </div>
+    `;
+    
+    // Actualizar la vista previa
+    previewPanel.innerHTML = '';
+    previewPanel.appendChild(preview);
+}
+
+// Funciones para la página del Asistente IA
+function handleAIAssistant() {
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const chatHistory = document.getElementById('chatHistory');
+    const newChatBtn = document.getElementById('newChatBtn');
+    
+    if (!chatInput || !sendChatBtn || !chatHistory || !newChatBtn) return;
+    
+    // Enviar mensaje
+    const sendMessage = () => {
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        // Agregar mensaje del usuario
+        appendUserMessage(message);
+        
+        // Limpiar input
+        chatInput.value = '';
+        
+        // Simular respuesta del asistente después de un breve retraso
+        setTimeout(() => {
+            const response = `He recibido tu mensaje: "${message}". Esta es una simulación de respuesta. En un sistema real, esto se conectaría a un servicio de IA como OpenAI para generar respuestas contextuales.`;
+            appendAssistantMessage(response);
+        }, 1000);
+    };
+    
+    // Evento para enviar mensaje con el botón
+    sendChatBtn.addEventListener('click', sendMessage);
+    
+    // Evento para enviar mensaje con Enter
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    // Evento para nueva conversación
+    newChatBtn.addEventListener('click', () => {
+        // Limpiar historial excepto el mensaje inicial
+        while (chatHistory.children.length > 1) {
+            chatHistory.removeChild(chatHistory.lastChild);
+        }
+        chatInput.value = '';
+    });
+    
+    // Botones de sugerencias
+    document.querySelectorAll('#contentSuggestions button').forEach(btn => {
         btn.addEventListener('click', () => {
-            const input = btn.parentElement.previousElementSibling;
-            const preview = document.getElementById(input.id.replace('Input', 'Preview'));
-            input.value = '';
-            preview.classList.add('d-none');
-            config[input.id.replace('Input', '').toLowerCase()] = null;
-            saveConfig();
-            updatePreview();
-            syncConfigWithBackend();
+            const prompt = btn.dataset.prompt;
+            if (prompt) {
+                chatInput.value = prompt;
+                sendMessage();
+            }
         });
     });
+}
 
-    // Other tabs
-    handleTemplates();
-    handleReport();
-    handleAIAssistant();
-    handleSettings();
+function appendUserMessage(message) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = 'd-flex mb-3 flex-row-reverse';
+    messageEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-user fs-4 text-secondary"></i>
+        </div>
+        <div class="flex-grow-1 me-3">
+            <div class="bg-primary text-white rounded p-3">
+                <p class="mb-0">${message}</p>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(messageEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function appendAssistantMessage(message) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return;
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = 'd-flex mb-3';
+    messageEl.innerHTML = `
+        <div class="flex-shrink-0">
+            <i class="fas fa-robot fs-4 text-primary"></i>
+        </div>
+        <div class="flex-grow-1 ms-3">
+            <div class="bg-light rounded p-3">
+                <p class="mb-0">${message}</p>
+            </div>
+        </div>
+    `;
+    
+    chatHistory.appendChild(messageEl);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// Funciones para la configuración del perfil y ajustes
+function getUserProfile() {
+    // En un sistema real, este perfil vendría de la API
+    return {
+        _id: config.userId,
+        email: 'usuario@ejemplo.com',
+        profile: {
+            fullName: 'Dr. Juan Pérez',
+            licenseNumber: 'PSY12345',
+            specialty: 'Psicología Clínica',
+            phone: '123-456-7890'
+        }
+    };
+}
+
+function loadUserProfile() {
+    const profile = getUserProfile();
+    if (!profile) return;
+    
+    // Actualizar campos del perfil
+    document.getElementById('settingsFullName')?.value = profile.profile?.fullName || '';
+    document.getElementById('settingsLicense')?.value = profile.profile?.licenseNumber || '';
+    document.getElementById('settingsSpecialty')?.value = profile.profile?.specialty || '';
+    document.getElementById('settingsEmail')?.value = profile.email || '';
+    document.getElementById('settingsPhone')?.value = profile.profile?.phone || '';
+    
+    // Actualizar estado de verificación de email
+    updateEmailVerificationStatus(false); // Simulando que no está verificado
+}
+
+function updateEmailVerificationStatus(isVerified) {
+    const statusElement = document.getElementById('emailVerificationStatus');
+    if (!statusElement) return;
+    
+    if (isVerified) {
+        statusElement.innerHTML = '<span class="badge bg-success">Verificado</span>';
+    } else {
+        statusElement.innerHTML = '<span class="badge bg-warning">No verificado</span>';
+    }
+}
+
+// Inicializar todo cuando el DOM esté cargado
+document.addEventListener('DOMContentLoaded', () => {
+    if (!requireAuth()) return; // Verificar autenticación
+    
+    try {
+        // Cargar configuración
+        loadConfig();
+        
+        // Cargar usuario
+        loadUserProfile();
+        
+        // Cargar plantillas
+        loadTemplates();
+        
+        // Inicializar eventos de la página de personalización
+        document.querySelectorAll('[type="file"]').forEach(input => {
+            const previewId = input.id.replace('Input', 'Preview');
+            input.addEventListener('change', () => handleImagePreview(input, previewId));
+        });
+        
+        // Evento para botones de limpiar imagen
+        document.querySelectorAll('.clear-image-btn').forEach(btn => {
+            btn.addEventListener('click', () => clearImage(btn.dataset.target));
+        });
+        
+        // Eventos para colores y fuentes
+        handleColorChange('primaryColor', '.preview-title');
+        handleColorChange('secondaryColor', '.preview-text');
+        handleFontChange('headerFont', '.preview-title');
+        handleFontChange('bodyFont', '.preview-text');
+        handleWatermarkToggle();
+        
+        // Evento para botón de guardar configuración
+        document.getElementById('saveConfigBtn')?.addEventListener('click', () => {
+            syncConfigWithBackend();
+            showToast('Configuración guardada correctamente', 'success');
+        });
+        
+        // Eventos para plantillas
+        document.getElementById('newTemplateBtn')?.addEventListener('click', createNewTemplate);
+        document.getElementById('saveTemplateBtn')?.addEventListener('click', saveTemplate);
+        document.getElementById('duplicateTemplateBtn')?.addEventListener('click', duplicateTemplate);
+        
+        // Evento para búsqueda de plantillas
+        document.getElementById('templateSearch')?.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#templateList a').forEach(item => {
+                const name = item.querySelector('h6').textContent.toLowerCase();
+                const category = item.querySelector('small').textContent.toLowerCase();
+                
+                if (name.includes(searchTerm) || category.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+        
+        // Eventos para el modal de nueva sección
+        document.getElementById('addSectionBtn')?.addEventListener('click', () => {
+            // Limpiar modal
+            document.getElementById('sectionName').value = '';
+            document.getElementById('sectionType').value = 'text';
+            document.getElementById('sectionRequired').checked = false;
+            document.getElementById('optionsContainer').style.display = 'none';
+            document.getElementById('optionsList').innerHTML = '';
+            
+            // Mostrar modal
+            const modal = new bootstrap.Modal(document.getElementById('newSectionModal'));
+            modal.show();
+        });
+        
+        // Cambiar tipo de sección
+        document.getElementById('sectionType')?.addEventListener('change', (e) => {
+            const type = e.target.value;
+            const optionsContainer = document.getElementById('optionsContainer');
+            
+            if (type === 'checkbox' || type === 'radio' || type === 'select') {
+                optionsContainer.style.display = 'block';
+                if (document.querySelectorAll('#optionsList .input-group').length === 0) {
+                    addOptionInput();
+                }
+            } else {
+                optionsContainer.style.display = 'none';
+            }
+        });
+        
+        // Agregar opción
+        document.getElementById('addOptionBtn')?.addEventListener('click', () => {
+            addOptionInput();
+        });
+        
+        // Guardar nueva sección
+        document.getElementById('saveNewSectionBtn')?.addEventListener('click', () => {
+            const name = document.getElementById('sectionName').value;
+            const type = document.getElementById('sectionType').value;
+            const required = document.getElementById('sectionRequired').checked;
+            
+            if (!name) {
+                alert('El nombre de la sección es obligatorio');
+                return;
+            }
+            
+            // Obtener opciones si es necesario
+            let options = [];
+            if (type === 'checkbox' || type === 'radio' || type === 'select') {
+                document.querySelectorAll('.option-input').forEach(input => {
+                    if (input.value.trim()) {
+                        options.push(input.value.trim());
+                    }
+                });
+                
+                if (options.length === 0) {
+                    alert('Debe agregar al menos una opción');
+                    return;
+                }
+            }
+            
+            // Crear nueva sección
+            const newSection = {
+                name,
+                type,
+                required,
+                options
+            };
+            
+            // Agregar a la plantilla
+            if (!state.editingTemplate) {
+                return;
+            }
+            
+            if (!state.editingTemplate.sections) {
+                state.editingTemplate.sections = [];
+            }
+            
+            state.editingTemplate.sections.push(newSection);
+            
+            // Cerrar modal y actualizar UI
+            bootstrap.Modal.getInstance(document.getElementById('newSectionModal')).hide();
+            renderTemplateSections(state.editingTemplate.sections);
+        });
+        
+        // Eventos para guardar/descargar informe
+        document.getElementById('saveReportBtn')?.addEventListener('click', saveReport);
+        document.getElementById('saveDraftBtn')?.addEventListener('click', saveReportDraft);
+        document.getElementById('previewReportBtn')?.addEventListener('click', previewReport);
+        document.getElementById('downloadPdfBtn')?.addEventListener('click', downloadReportPdf);
+        
+        // Eventos para configuración de seguridad
+        document.getElementById('changePasswordBtn')?.addEventListener('click', changePassword);
+        document.getElementById('sendVerificationEmailBtn')?.addEventListener('click', sendVerificationEmail);
+        
+        // Gestión de almacenamiento
+        document.getElementById('clearCacheBtn')?.addEventListener('click', clearCache);
+        
+        // Simulación de almacenamiento
+        updateStorageInfo();
+        
+        // Manejar asistente IA
+        handleAIAssistant();
+    } catch (error) {
+        handleError(error, 'Error al inicializar la aplicación');
+    }
 });
+
+// Guardar informe
+function saveReport() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // Recopilar datos del formulario
+    const reportData = collectReportData();
+    
+    // En un sistema real, aquí se enviaría a la API
+    showToast('Informe guardado correctamente', 'success');
+    console.log('Datos del informe:', reportData);
+}
+
+// Guardar borrador
+function saveReportDraft() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // Recopilar datos del formulario
+    const reportData = collectReportData();
+    
+    // Guardar en localStorage
+    try {
+        localStorage.setItem('reportDraft', JSON.stringify(reportData));
+        showToast('Borrador guardado localmente', 'success');
+    } catch (error) {
+        handleError(error, 'Error al guardar borrador');
+    }
+}
+
+// Recopilar datos del informe
+function collectReportData() {
+    const template = config.templates.find(t => t._id === state.selectedTemplateId);
+    if (!template) return null;
+    
+    const data = {
+        templateId: template._id,
+        templateName: template.name,
+        patient: {
+            name: document.getElementById('patientName')?.value || '',
+            age: document.getElementById('patientAge')?.value || '',
+            id: document.getElementById('patientId')?.value || '',
+            phone: document.getElementById('patientPhone')?.value || ''
+        },
+        date: document.getElementById('reportDate')?.value || new Date().toISOString().split('T')[0],
+        professional: {
+            name: document.getElementById('professionalName')?.value || '',
+            license: document.getElementById('professionalLicense')?.value || '',
+            specialty: document.getElementById('professionalSpecialty')?.value || ''
+        },
+        sections: []
+    };
+    
+    // Recopilar datos de secciones
+    if (template.sections && template.sections.length > 0) {
+        template.sections.forEach((section, index) => {
+            const sectionData = {
+                name: section.name,
+                type: section.type,
+                required: section.required
+            };
+            
+            switch (section.type) {
+                case 'text':
+                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
+                    break;
+                    
+                case 'checkbox':
+                    sectionData.values = [];
+                    if (section.options && section.options.length > 0) {
+                        section.options.forEach((option, optIndex) => {
+                            const isChecked = document.getElementById(`section_${index}_opt_${optIndex}`)?.checked;
+                            if (isChecked) {
+                                sectionData.values.push(option);
+                            }
+                        });
+                    }
+                    break;
+                    
+                case 'radio':
+                    sectionData.value = document.querySelector(`input[name="section_${index}"]:checked`)?.value || '';
+                    break;
+                    
+                case 'select':
+                    sectionData.value = document.getElementById(`section_${index}`)?.value || '';
+                    break;
+            }
+            
+            data.sections.push(sectionData);
+        });
+    }
+    
+    return data;
+}
+
+// Previsualizar informe
+function previewReport() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // En un sistema real, esto generaría un PDF temporal
+    const reportData = collectReportData();
+    
+    // Simular previsualización
+    showToast('Función de previsualización no implementada en la demo', 'info');
+    console.log('Vista previa del informe:', reportData);
+}
+
+// Descargar PDF
+function downloadReportPdf() {
+    if (!state.selectedTemplateId) {
+        showToast('Debe seleccionar una plantilla', 'error');
+        return;
+    }
+    
+    // En un sistema real, esto generaría y descargaría un PDF
+    const reportData = collectReportData();
+    
+    // Simular descarga
+    showToast('Función de descarga no implementada en la demo', 'info');
+    console.log('Descarga de PDF:', reportData);
+}
+
+// Cambiar contraseña
+function changePassword() {
+    const currentPassword = document.getElementById('currentPassword')?.value;
+    const newPassword = document.getElementById('newPassword')?.value;
+    const confirmNewPassword = document.getElementById('confirmNewPassword')?.value;
+    
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+        showToast('Todos los campos son obligatorios', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmNewPassword) {
+        showToast('Las contraseñas no coinciden', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showToast('La contraseña debe tener al menos 8 caracteres', 'error');
+        return;
+    }
+    
+    // En un sistema real, aquí se enviaría a la API
+    showToast('Contraseña cambiada correctamente', 'success');
+    
+    // Limpiar campos
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmNewPassword').value = '';
+}
+
+// Enviar email de verificación
+function sendVerificationEmail() {
+    // En un sistema real, aquí se enviaría a la API
+    showToast('Correo de verificación enviado', 'success');
+}
+
+// Limpiar caché
+function clearCache() {
+    // Mostrar confirmación
+    if (!confirm('¿Está seguro de limpiar la caché? Esto eliminará todos los datos guardados localmente.')) {
+        return;
+    }
+    
+    // Limpiar localStorage (excepto token de autenticación)
+    const authToken = localStorage.getItem('authToken');
+    localStorage.clear();
+    localStorage.setItem('authToken', authToken);
+    
+    // Actualizar información de almacenamiento
+    updateStorageInfo();
+    
+    showToast('Caché limpiada correctamente', 'success');
+    
+    // Recargar la página para reiniciar la aplicación
+    setTimeout(() => {
+        window.location.reload();
+    }, 1500);
+}
+
+// Actualizar información de almacenamiento
+function updateStorageInfo() {
+    // Estimar el uso de almacenamiento
+    let storageUsed = 0;
+    
+    // Contar bytes de cada item en localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        storageUsed += key.length + value.length;
+    }
+    
+    // Convertir a KB
+    const storageKB = Math.round(storageUsed / 1024);
+    
+    // Actualizar interfaz
+    document.getElementById('storageUsed')?.textContent = `${storageKB} KB de 5 MB`;
+    
+    // Actualizar barra de progreso (5 MB = 5120 KB)
+    const percentage = Math.min(100, (storageKB / 5120) * 100);
+    document.getElementById('storageProgress')?.style.setProperty('width', `${percentage}%`);
+}
+
+// Obtener información del usuario
+function getUserProfile() {
+    // Función ya implementada arriba
+    return {
+        _id: config.userId,
+        email: 'usuario@ejemplo.com',
+        profile: {
+            fullName: 'Dr. Juan Pérez',
+            licenseNumber: 'PSY12345',
+            specialty: 'Psicología Clínica',
+            phone: '123-456-7890'
+        }
+    };
+}

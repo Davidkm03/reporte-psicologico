@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - Sistema de Informes Psicológicos</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="assets/css/styles.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-body p-5">
+                        <h2 class="text-center mb-4">Registro de Profesional</h2>
+                        <form id="registerForm">
+                            <!-- Información de Cuenta -->
+                            <div class="mb-4">
+                                <h5 class="mb-3">Información de Cuenta</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="email" class="form-label">Correo Electrónico</label>
+                                        <input type="email" class="form-control" id="email" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="password" class="form-label">Contraseña</label>
+                                        <input type="password" class="form-control" id="password" required minlength="8">
+                                        <small class="text-muted">Mínimo 8 caracteres</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="confirmPassword" class="form-label">Confirmar Contraseña</label>
+                                        <input type="password" class="form-control" id="confirmPassword" required minlength="8">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="role" class="form-label">Rol</label>
+                                        <select class="form-select" id="role" required>
+                                            <option value="psychologist">Psicólogo</option>
+                                            <option value="admin">Administrador</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Información Profesional -->
+                            <div class="mb-4">
+                                <h5 class="mb-3">Información Profesional</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="fullName" class="form-label">Nombre Completo</label>
+                                        <input type="text" class="form-control" id="fullName" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="licenseNumber" class="form-label">Número de Licencia</label>
+                                        <input type="text" class="form-control" id="licenseNumber" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="specialty" class="form-label">Especialidad</label>
+                                        <input type="text" class="form-control" id="specialty">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="phone" class="form-label">Teléfono</label>
+                                        <input type="tel" class="form-control" id="phone">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="termsAgreement" required>
+                                <label class="form-check-label" for="termsAgreement">
+                                    Acepto los <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Términos y Condiciones</a>
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 mb-3">
+                                <i class="fas fa-user-plus"></i> Registrarse
+                            </button>
+                        </form>
+                        <hr class="my-4">
+                        <div class="text-center">
+                            <p class="mb-0">¿Ya tienes una cuenta?</p>
+                            <a href="/login.html" class="btn btn-outline-secondary mt-2">
+                                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Términos y Condiciones -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="termsModalLabel">Términos y Condiciones</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>1. Uso del Sistema</h6>
+                    <p>Este sistema está diseñado para profesionales de la psicología. Los usuarios se comprometen a utilizar el sistema únicamente para fines profesionales y legítimos.</p>
+                    
+                    <h6>2. Privacidad y Confidencialidad</h6>
+                    <p>Los profesionales que utilicen este sistema deben asegurar la confidencialidad de los datos de los pacientes según las normativas aplicables (LOPD, RGPD, HIPAA, etc.).</p>
+                    
+                    <h6>3. Responsabilidad Profesional</h6>
+                    <p>Los usuarios son los únicos responsables del contenido que generan utilizando esta herramienta y deben asegurarse de que cumple con los estándares éticos y profesionales de la psicología.</p>
+                    
+                    <h6>4. Protección de Datos</h6>
+                    <p>El sistema almacena información para facilitar su funcionamiento. Los datos se procesan de acuerdo con nuestra política de privacidad y las leyes aplicables.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert para mensajes -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 5">
+        <div id="registerAlert" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header" id="registerAlertHeader">
+                <strong class="me-auto" id="registerAlertTitle">Mensaje</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="registerAlertMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const role = document.getElementById('role').value;
+            
+            // Verificar contraseñas
+            if (password !== confirmPassword) {
+                showAlert('Las contraseñas no coinciden', 'error');
+                return;
+            }
+            
+            // Construir objeto de datos de perfil
+            const profile = {
+                fullName: document.getElementById('fullName').value,
+                licenseNumber: document.getElementById('licenseNumber').value,
+                specialty: document.getElementById('specialty').value,
+                phone: document.getElementById('phone').value
+            };
+            
+            try {
+                // Llamar a la función de registro
+                await register({ email, password, role, profile });
+                
+                // Mostrar mensaje de éxito
+                showAlert('Registro exitoso. Redirigiendo al inicio de sesión...', 'success');
+                
+                // Redirigir después de un breve retraso
+                setTimeout(() => {
+                    window.location.href = '/login.html';
+                }, 2000);
+                
+            } catch (error) {
+                showAlert(error.message || 'Error en el registro', 'error');
+            }
+        });
+        
+        function showAlert(message, type = 'info') {
+            const alertElement = document.getElementById('registerAlert');
+            const alertHeader = document.getElementById('registerAlertHeader');
+            const alertTitle = document.getElementById('registerAlertTitle');
+            const alertMessage = document.getElementById('registerAlertMessage');
+            
+            // Configurar tipo de alerta
+            if (type === 'error') {
+                alertHeader.className = 'toast-header bg-danger text-white';
+                alertTitle.textContent = 'Error';
+            } else if (type === 'success') {
+                alertHeader.className = 'toast-header bg-success text-white';
+                alertTitle.textContent = 'Éxito';
+            } else {
+                alertHeader.className = 'toast-header bg-info text-white';
+                alertTitle.textContent = 'Información';
+            }
+            
+            // Establecer el mensaje
+            alertMessage.textContent = message;
+            
+            // Mostrar el toast
+            const toast = new bootstrap.Toast(alertElement);
+            toast.show();
+        }
+    </script>
+</body>
+</html>

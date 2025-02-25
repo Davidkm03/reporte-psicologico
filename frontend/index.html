@@ -6,64 +6,31 @@
     <title>Sistema de Informes Psicológicos</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .nav-tabs .nav-link {
-            color: #495057;
-            border: none;
-            padding: 1rem 1.5rem;
-            transition: all 0.3s;
-        }
-        .nav-tabs .nav-link.active {
-            color: #0d6efd;
-            border-bottom: 3px solid #0d6efd;
-            font-weight: bold;
-        }
-        .nav-tabs .nav-link:hover {
-            border-color: transparent;
-            isolation: isolate;
-            background-color: #f8f9fa;
-        }
-        .tab-pane {
-            padding: 2rem;
-        }
-        .config-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .preview-image {
-            max-width: 200px;
-            max-height: 100px;
-            margin: 10px 0;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 5px;
-        }
-        .color-preview {
-            width: 30px;
-            height: 30px;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 10px;
-        }
-    </style>
+    <link href="assets/css/styles.css" rel="stylesheet">
 </head>
 <body class="bg-light">
     <div class="container-fluid">
         <!-- Header -->
-        <header class="py-4 bg-white shadow-sm mb-4">
+        <header class="py-3 bg-white shadow-sm mb-4">
             <div class="container">
                 <div class="row align-items-center">
                     <div class="col">
                         <h1 class="h3 mb-0">Sistema de Informes Psicológicos</h1>
                     </div>
-                    <div class="col-auto">
-                        <button class="btn btn-success">
+                    <div class="col-auto d-flex align-items-center">
+                        <div class="dropdown me-3">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user me-1"></i>
+                                <span id="userDisplay">Usuario</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-id-card me-2"></i>Perfil</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Configuración</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" id="logoutBtn"><i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión</a></li>
+                            </ul>
+                        </div>
+                        <button class="btn btn-success" id="saveConfigBtn">
                             <i class="fas fa-save"></i> Guardar Configuración
                         </button>
                     </div>
@@ -120,7 +87,7 @@
                                     <label class="form-label fw-bold">Logo de la Empresa</label>
                                     <div class="input-group">
                                         <input type="file" class="form-control" id="logoInput" accept="image/*">
-                                        <button class="btn btn-outline-secondary" type="button">
+                                        <button class="btn btn-outline-secondary clear-image-btn" type="button" data-target="logoInput">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -139,7 +106,7 @@
                                             <div class="input-group">
                                                 <input type="color" class="form-control form-control-color" 
                                                        id="primaryColor" value="#0d6efd">
-                                                <input type="text" class="form-control" value="#0d6efd">
+                                                <input type="text" class="form-control color-text" data-color-input="primaryColor" value="#0d6efd">
                                             </div>
                                         </div>
                                         <div class="col-md-6">
@@ -147,7 +114,7 @@
                                             <div class="input-group">
                                                 <input type="color" class="form-control form-control-color" 
                                                        id="secondaryColor" value="#6c757d">
-                                                <input type="text" class="form-control" value="#6c757d">
+                                                <input type="text" class="form-control color-text" data-color-input="secondaryColor" value="#6c757d">
                                             </div>
                                         </div>
                                     </div>
@@ -188,7 +155,7 @@
                                     <label class="form-label fw-bold">Encabezado Personalizado</label>
                                     <div class="input-group mb-3">
                                         <input type="file" class="form-control" id="headerInput" accept="image/*">
-                                        <button class="btn btn-outline-secondary" type="button">
+                                        <button class="btn btn-outline-secondary clear-image-btn" type="button" data-target="headerInput">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -200,7 +167,7 @@
                                     <label class="form-label fw-bold">Pie de Página Personalizado</label>
                                     <div class="input-group mb-3">
                                         <input type="file" class="form-control" id="footerInput" accept="image/*">
-                                        <button class="btn btn-outline-secondary" type="button">
+                                        <button class="btn btn-outline-secondary clear-image-btn" type="button" data-target="footerInput">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -212,7 +179,7 @@
                                     <label class="form-label fw-bold">Marca de Agua</label>
                                     <div class="input-group mb-3">
                                         <input type="file" class="form-control" id="watermarkInput" accept="image/*">
-                                        <button class="btn btn-outline-secondary" type="button">
+                                        <button class="btn btn-outline-secondary clear-image-btn" type="button" data-target="watermarkInput">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
@@ -234,7 +201,7 @@
                                 <div id="stylePreview" class="border rounded p-4">
                                     <!-- La vista previa se actualizará dinámicamente -->
                                     <div class="text-center mb-4">
-                                        <img src="/api/placeholder/200/100" alt="Logo Preview" class="mb-3">
+                                        <img src="/static/images/placeholder-logo.png" alt="Logo Preview" class="mb-3 preview-logo">
                                     </div>
                                     <h1 class="preview-title">Título del Informe</h1>
                                     <p class="preview-text">
@@ -246,16 +213,16 @@
                     </div>
                 </div>
 
-                <!-- Otros tabs se añadirán en las siguientes partes -->
+                <!-- Tab Plantillas -->
                 <div class="tab-pane fade" id="templates" role="tabpanel">
-                    
+                    <!-- Contenido de Plantillas -->
                     <div class="row">
                         <!-- Lista de Plantillas -->
                         <div class="col-md-4">
                             <div class="config-card">
                                 <div class="d-flex justify-content-between align-items-center mb-4">
                                     <h4 class="mb-0">Plantillas Disponibles</h4>
-                                    <button class="btn btn-primary btn-sm">
+                                    <button class="btn btn-primary btn-sm" id="newTemplateBtn">
                                         <i class="fas fa-plus"></i> Nueva
                                     </button>
                                 </div>
@@ -265,39 +232,16 @@
                                     <span class="input-group-text">
                                         <i class="fas fa-search"></i>
                                     </span>
-                                    <input type="text" class="form-control" placeholder="Buscar plantilla...">
+                                    <input type="text" class="form-control" id="templateSearch" placeholder="Buscar plantilla...">
                                 </div>
 
                                 <!-- Lista de Plantillas -->
-                                <div class="list-group">
-                                    <a href="#" class="list-group-item list-group-item-action active">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Informe Psicológico Infantil</h6>
-                                            <small><i class="fas fa-star"></i></small>
+                                <div class="list-group" id="templateList">
+                                    <div class="d-flex justify-content-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Cargando...</span>
                                         </div>
-                                        <small class="text-muted">Evaluación completa para niños</small>
-                                    </a>
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Evaluación Cognitiva</h6>
-                                            <small><i class="far fa-star"></i></small>
-                                        </div>
-                                        <small class="text-muted">Análisis de funciones cognitivas</small>
-                                    </a>
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Informe Conductual</h6>
-                                            <small><i class="far fa-star"></i></small>
-                                        </div>
-                                        <small class="text-muted">Evaluación de comportamiento</small>
-                                    </a>
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Evaluación Emocional</h6>
-                                            <small><i class="far fa-star"></i></small>
-                                        </div>
-                                        <small class="text-muted">Análisis del estado emocional</small>
-                                    </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -308,10 +252,10 @@
                                 <div class="d-flex justify-content-between align-items-center mb-4">
                                     <h4 class="mb-0">Editor de Plantilla</h4>
                                     <div>
-                                        <button class="btn btn-outline-primary me-2">
+                                        <button class="btn btn-outline-primary me-2" id="duplicateTemplateBtn">
                                             <i class="fas fa-copy"></i> Duplicar
                                         </button>
-                                        <button class="btn btn-success">
+                                        <button class="btn btn-success" id="saveTemplateBtn">
                                             <i class="fas fa-save"></i> Guardar
                                         </button>
                                     </div>
@@ -322,16 +266,20 @@
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Nombre de la Plantilla</label>
-                                            <input type="text" class="form-control" value="Informe Psicológico Infantil">
+                                            <input type="text" class="form-control" id="templateName">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Categoría</label>
-                                            <select class="form-select">
-                                                <option>Infantil</option>
-                                                <option>Adultos</option>
-                                                <option>Familiar</option>
-                                                <option>Educativa</option>
+                                            <select class="form-select" id="templateCategory">
+                                                <option value="Infantil">Infantil</option>
+                                                <option value="Adultos">Adultos</option>
+                                                <option value="Familiar">Familiar</option>
+                                                <option value="Educativa">Educativa</option>
                                             </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Descripción</label>
+                                            <textarea class="form-control" id="templateDescription" rows="2"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -340,94 +288,12 @@
                                 <div class="mb-4">
                                     <h5 class="mb-3">Estructura del Informe</h5>
                                     <div class="border rounded p-3">
-                                        <!-- Sección Datos Personales -->
-                                        <div class="border rounded p-3 mb-3">
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-grip-vertical text-muted me-2"></i>
-                                                    Datos Personales
-                                                </h6>
-                                                <div>
-                                                    <button class="btn btn-sm btn-outline-secondary me-2">
-                                                        <i class="fas fa-cog"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-danger">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="row g-2">
-                                                <div class="col-md-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" checked>
-                                                        <label class="form-check-label">Nombre completo</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" checked>
-                                                        <label class="form-check-label">Edad</label>
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" checked>
-                                                        <label class="form-check-label">Fecha de nacimiento</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Sección Motivo de Consulta -->
-                                        <div class="border rounded p-3 mb-3">
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-grip-vertical text-muted me-2"></i>
-                                                    Motivo de Consulta
-                                                </h6>
-                                                <div>
-                                                    <button class="btn btn-sm btn-outline-secondary me-2">
-                                                        <i class="fas fa-cog"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-danger">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <textarea class="form-control" rows="2" 
-                                                placeholder="Descripción predeterminada..."></textarea>
-                                        </div>
-
-                                        <!-- Sección Antecedentes -->
-                                        <div class="border rounded p-3 mb-3">
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <h6 class="mb-0">
-                                                    <i class="fas fa-grip-vertical text-muted me-2"></i>
-                                                    Antecedentes
-                                                </h6>
-                                                <div>
-                                                    <button class="btn btn-sm btn-outline-secondary me-2">
-                                                        <i class="fas fa-cog"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-danger">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="mb-2">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" checked>
-                                                    <label class="form-check-label">Antecedentes familiares</label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" checked>
-                                                    <label class="form-check-label">Antecedentes médicos</label>
-                                                </div>
-                                            </div>
+                                        <div id="templateSections">
+                                            <!-- Las secciones se añadirán dinámicamente -->
                                         </div>
 
                                         <!-- Botón Agregar Sección -->
-                                        <button class="btn btn-outline-primary w-100">
+                                        <button class="btn btn-outline-primary w-100 mt-3" id="addSectionBtn">
                                             <i class="fas fa-plus"></i> Agregar Sección
                                         </button>
                                     </div>
@@ -436,8 +302,10 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Tab Informe -->
                 <div class="tab-pane fade" id="report" role="tabpanel">
-                    
+                    <!-- Contenido de Informe -->
                     <div class="row">
                         <!-- Formulario del Informe -->
                         <div class="col-md-8">
@@ -445,10 +313,10 @@
                                 <div class="d-flex justify-content-between align-items-center mb-4">
                                     <h4 class="mb-0">Nuevo Informe</h4>
                                     <div>
-                                        <button class="btn btn-outline-primary me-2">
+                                        <button class="btn btn-outline-primary me-2" id="saveDraftBtn">
                                             <i class="fas fa-file"></i> Borrador
                                         </button>
-                                        <button class="btn btn-success">
+                                        <button class="btn btn-success" id="saveReportBtn">
                                             <i class="fas fa-save"></i> Guardar
                                         </button>
                                     </div>
@@ -457,150 +325,15 @@
                                 <!-- Selección de Plantilla -->
                                 <div class="mb-4">
                                     <label class="form-label">Seleccionar Plantilla</label>
-                                    <select class="form-select">
-                                        <option>Informe Psicológico Infantil</option>
-                                        <option>Evaluación Cognitiva</option>
-                                        <option>Informe Conductual</option>
-                                        <option>Evaluación Emocional</option>
+                                    <select class="form-select" id="reportTemplate">
+                                        <!-- Las opciones se cargarán dinámicamente -->
                                     </select>
                                 </div>
 
-                                <!-- Información del Paciente -->
-                                <div class="mb-4">
-                                    <h5 class="mb-3">Información del Paciente</h5>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Nombre completo</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Edad</label>
-                                            <input type="number" class="form-control">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Fecha</label>
-                                            <input type="date" class="form-control">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Documento de Identidad</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Teléfono</label>
-                                            <input type="tel" class="form-control">
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Dirección</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Motivo de Consulta -->
-                                <div class="mb-4">
-                                    <h5 class="mb-3">Motivo de Consulta</h5>
-                                    <div class="mb-3">
-                                        <label class="form-label">Descripción del Motivo</label>
-                                        <textarea class="form-control" rows="3"></textarea>
-                                    </div>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Tipo de Consulta</label>
-                                            <select class="form-select">
-                                                <option>Presencial</option>
-                                                <option>Virtual</option>
-                                                <option>Mixta</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Solicitante</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Evaluación -->
-                                <div class="mb-4">
-                                    <h5 class="mb-3">Evaluación</h5>
-                                    
-                                    <!-- Estado Mental -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Estado Mental</label>
-                                        <textarea class="form-control" rows="3" 
-                                                placeholder="Descripción del estado mental del paciente..."></textarea>
-                                    </div>
-
-                                    <!-- Estado Cognitivo -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Estado Cognitivo</label>
-                                        <div class="row g-2">
-                                            <div class="col-md-6">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox">
-                                                    <label class="form-check-label">Orientado en espacio</label>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox">
-                                                    <label class="form-check-label">Orientado en tiempo</label>
-                                                </div>
-                                            </div>
-                                            <div class="col-12">
-                                                <textarea class="form-control" rows="2" 
-                                                    placeholder="Observaciones adicionales..."></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Pruebas Aplicadas -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Pruebas Aplicadas</label>
-                                        <div class="mb-2">
-                                            <select class="form-select mb-2">
-                                                <option>Test de la Figura Humana</option>
-                                                <option>Test de la Familia</option>
-                                                <option>Test del Árbol</option>
-                                                <option>Otras pruebas...</option>
-                                            </select>
-                                            <textarea class="form-control" rows="3" 
-                                                placeholder="Resultados de la prueba..."></textarea>
-                                        </div>
-                                        <button class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-plus"></i> Agregar Prueba
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Conclusiones -->
-                                <div class="mb-4">
-                                    <h5 class="mb-3">Conclusiones y Recomendaciones</h5>
-                                    <div class="mb-3">
-                                        <label class="form-label">Conclusiones</label>
-                                        <textarea class="form-control" rows="4"></textarea>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Recomendaciones</label>
-                                        <textarea class="form-control" rows="4"></textarea>
-                                    </div>
-                                </div>
-
-                                <!-- Profesional -->
-                                <div class="mb-4">
-                                    <h5 class="mb-3">Información del Profesional</h5>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Nombre del Profesional</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Número de Licencia</label>
-                                            <input type="text" class="form-control">
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label">Especialidad</label>
-                                            <input type="text" class="form-control">
-                                        </div>
+                                <!-- Contenido dinámico del informe basado en la plantilla -->
+                                <div id="reportFormContent">
+                                    <div class="text-center py-5">
+                                        <p class="text-muted">Seleccione una plantilla para comenzar</p>
                                     </div>
                                 </div>
                             </div>
@@ -613,36 +346,36 @@
                                 <h5 class="mb-3">Opciones de PDF</h5>
                                 <div class="mb-3">
                                     <label class="form-label">Formato de Página</label>
-                                    <select class="form-select">
-                                        <option>A4</option>
-                                        <option>Carta</option>
-                                        <option>Legal</option>
+                                    <select class="form-select" id="pdfPageFormat">
+                                        <option value="A4">A4</option>
+                                        <option value="Letter">Carta</option>
+                                        <option value="Legal">Legal</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Orientación</label>
                                     <div class="btn-group w-100">
-                                        <input type="radio" class="btn-check" name="orientation" id="vertical" checked>
-                                        <label class="btn btn-outline-primary" for="vertical">
+                                        <input type="radio" class="btn-check" name="orientation" id="orientationVertical" checked>
+                                        <label class="btn btn-outline-primary" for="orientationVertical">
                                             <i class="fas fa-file-alt"></i> Vertical
                                         </label>
-                                        <input type="radio" class="btn-check" name="orientation" id="horizontal">
-                                        <label class="btn btn-outline-primary" for="horizontal">
+                                        <input type="radio" class="btn-check" name="orientation" id="orientationHorizontal">
+                                        <label class="btn btn-outline-primary" for="orientationHorizontal">
                                             <i class="fas fa-file-alt fa-rotate-90"></i> Horizontal
                                         </label>
                                     </div>
                                 </div>
                                 <div class="mb-3">
                                     <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="watermark">
-                                        <label class="form-check-label" for="watermark">Incluir marca de agua</label>
+                                        <input class="form-check-input" type="checkbox" id="includeWatermark">
+                                        <label class="form-check-label" for="includeWatermark">Incluir marca de agua</label>
                                     </div>
                                 </div>
                                 <div class="d-grid gap-2">
-                                    <button class="btn btn-primary">
+                                    <button class="btn btn-primary" id="previewReportBtn">
                                         <i class="fas fa-eye"></i> Vista Previa
                                     </button>
-                                    <button class="btn btn-success">
+                                    <button class="btn btn-success" id="downloadPdfBtn">
                                         <i class="fas fa-download"></i> Descargar PDF
                                     </button>
                                 </div>
@@ -651,7 +384,7 @@
                             <!-- Vista Previa Rápida -->
                             <div class="config-card">
                                 <h5 class="mb-3">Vista Previa Rápida</h5>
-                                <div class="border rounded p-3 bg-light" style="height: 500px; overflow-y: auto;">
+                                <div class="border rounded p-3 bg-light" id="reportPreviewPanel" style="height: 500px; overflow-y: auto;">
                                     <!-- Aquí se mostrará la vista previa del informe -->
                                     <div class="text-center text-muted">
                                         <i class="fas fa-file-alt fa-3x mb-3"></i>
@@ -662,8 +395,10 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Tab Asistente IA -->
                 <div class="tab-pane fade" id="ai-assistant" role="tabpanel">
-                    
+                    <!-- Contenido del Asistente IA -->
                     <div class="row">
                         <!-- Panel Principal del Asistente -->
                         <div class="col-md-8">
@@ -671,13 +406,13 @@
                             <div class="config-card mb-4">
                                 <div class="d-flex justify-content-between align-items-center mb-4">
                                     <h4 class="mb-0">Asistente IA</h4>
-                                    <button class="btn btn-outline-secondary btn-sm">
+                                    <button class="btn btn-outline-secondary btn-sm" id="newChatBtn">
                                         <i class="fas fa-redo"></i> Nueva Conversación
                                     </button>
                                 </div>
 
                                 <!-- Historial de Chat -->
-                                <div class="border rounded p-3 mb-3" style="height: 400px; overflow-y: auto;">
+                                <div class="border rounded p-3 mb-3" id="chatHistory" style="height: 400px; overflow-y: auto;">
                                     <!-- Mensaje del Sistema -->
                                     <div class="d-flex mb-3">
                                         <div class="flex-shrink-0">
@@ -695,36 +430,12 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Mensaje del Usuario -->
-                                    <div class="d-flex mb-3 flex-row-reverse">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-user fs-4 text-secondary"></i>
-                                        </div>
-                                        <div class="flex-grow-1 me-3">
-                                            <div class="bg-primary text-white rounded p-3">
-                                                <p class="mb-0">¿Podrías ayudarme a redactar las conclusiones del informe?</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Respuesta del Asistente -->
-                                    <div class="d-flex mb-3">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-robot fs-4 text-primary"></i>
-                                        </div>
-                                        <div class="flex-grow-1 ms-3">
-                                            <div class="bg-light rounded p-3">
-                                                <p class="mb-0">Por supuesto. Basándome en la información del informe, puedo sugerir una estructura para las conclusiones. ¿Te gustaría que analice los datos actuales o prefieres que te guíe paso a paso en la redacción?</p>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 <!-- Input de Chat -->
                                 <div class="input-group">
-                                    <input type="text" class="form-control" placeholder="Escribe tu pregunta aquí...">
-                                    <button class="btn btn-primary">
+                                    <input type="text" class="form-control" id="chatInput" placeholder="Escribe tu pregunta aquí...">
+                                    <button class="btn btn-primary" id="sendChatBtn">
                                         <i class="fas fa-paper-plane"></i> Enviar
                                     </button>
                                 </div>
@@ -734,53 +445,21 @@
                             <div class="config-card">
                                 <h5 class="mb-4">Herramientas de Asistencia</h5>
                                 
-                                <!-- Análisis de Coherencia -->
-                                <div class="mb-4">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h6 class="mb-0">Análisis de Coherencia</h6>
-                                        <button class="btn btn-outline-primary btn-sm">
-                                            <i class="fas fa-sync"></i> Analizar
-                                        </button>
-                                    </div>
-                                    <div class="progress mb-2" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: 85%"></div>
-                                    </div>
-                                    <small class="text-muted">El informe actual tiene una coherencia del 85%</small>
-                                </div>
-
                                 <!-- Sugerencias de Contenido -->
                                 <div class="mb-4">
                                     <h6 class="mb-3">Sugerencias de Contenido</h6>
-                                    <div class="list-group">
-                                        <a href="#" class="list-group-item list-group-item-action">
-                                            <div class="d-flex w-100 justify-content-between">
-                                                <h6 class="mb-1">Ampliar descripción conductual</h6>
-                                                <small class="text-muted">Motivo de consulta</small>
-                                            </div>
-                                            <small>Se sugiere añadir más detalles sobre patrones de comportamiento</small>
-                                        </a>
-                                        <a href="#" class="list-group-item list-group-item-action">
-                                            <div class="d-flex w-100 justify-content-between">
-                                                <h6 class="mb-1">Incluir contexto familiar</h6>
-                                                <small class="text-muted">Antecedentes</small>
-                                            </div>
-                                            <small>Falta información sobre la dinámica familiar</small>
-                                        </a>
-                                    </div>
-                                </div>
-
-                                <!-- Generación de Contenido -->
-                                <div class="mb-4">
-                                    <h6 class="mb-3">Generación de Contenido</h6>
-                                    <div class="list-group">
-                                        <button class="list-group-item list-group-item-action">
-                                            <i class="fas fa-magic me-2"></i> Generar conclusiones
+                                    <div class="list-group" id="contentSuggestions">
+                                        <button class="list-group-item list-group-item-action" data-prompt="sugerir conclusiones">
+                                            <i class="fas fa-lightbulb me-2 text-warning"></i> Generar conclusiones
                                         </button>
-                                        <button class="list-group-item list-group-item-action">
-                                            <i class="fas fa-magic me-2"></i> Sugerir recomendaciones
+                                        <button class="list-group-item list-group-item-action" data-prompt="sugerir recomendaciones">
+                                            <i class="fas fa-lightbulb me-2 text-warning"></i> Sugerir recomendaciones
                                         </button>
-                                        <button class="list-group-item list-group-item-action">
-                                            <i class="fas fa-magic me-2"></i> Redactar resumen ejecutivo
+                                        <button class="list-group-item list-group-item-action" data-prompt="redactar resumen">
+                                            <i class="fas fa-lightbulb me-2 text-warning"></i> Redactar resumen ejecutivo
+                                        </button>
+                                        <button class="list-group-item list-group-item-action" data-prompt="mejorar redacción">
+                                            <i class="fas fa-lightbulb me-2 text-warning"></i> Mejorar redacción
                                         </button>
                                     </div>
                                 </div>
@@ -796,20 +475,20 @@
                                 <!-- Estilo de Redacción -->
                                 <div class="mb-3">
                                     <label class="form-label">Estilo de Redacción</label>
-                                    <select class="form-select">
-                                        <option>Formal</option>
-                                        <option>Técnico</option>
-                                        <option>Simplificado</option>
+                                    <select class="form-select" id="assistantStyle">
+                                        <option value="formal">Formal</option>
+                                        <option value="technical">Técnico</option>
+                                        <option value="simple">Simplificado</option>
                                     </select>
                                 </div>
 
                                 <!-- Nivel de Detalle -->
                                 <div class="mb-3">
                                     <label class="form-label">Nivel de Detalle</label>
-                                    <select class="form-select">
-                                        <option>Resumido</option>
-                                        <option>Estándar</option>
-                                        <option>Detallado</option>
+                                    <select class="form-select" id="assistantDetail">
+                                        <option value="brief">Resumido</option>
+                                        <option value="standard" selected>Estándar</option>
+                                        <option value="detailed">Detallado</option>
                                     </select>
                                 </div>
 
@@ -817,52 +496,22 @@
                                 <div class="mb-3">
                                     <label class="form-label">Preferencias</label>
                                     <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked>
-                                        <label class="form-check-label">Sugerencias automáticas</label>
+                                        <input class="form-check-input" type="checkbox" id="autoSuggestions" checked>
+                                        <label class="form-check-label" for="autoSuggestions">Sugerencias automáticas</label>
                                     </div>
                                     <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked>
-                                        <label class="form-check-label">Análisis en tiempo real</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox">
-                                        <label class="form-check-label">Autocompletado</label>
+                                        <input class="form-check-input" type="checkbox" id="realTimeAnalysis" checked>
+                                        <label class="form-check-label" for="realTimeAnalysis">Análisis en tiempo real</label>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Base de Conocimiento -->
-                            <div class="config-card">
-                                <h5 class="mb-3">Base de Conocimiento</h5>
-                                <div class="list-group">
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Guías de Evaluación</h6>
-                                            <small>12 docs</small>
-                                        </div>
-                                    </a>
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Protocolos de Evaluación</h6>
-                                            <small>8 docs</small>
-                                        </div>
-                                    </a>
-                                    <a href="#" class="list-group-item list-group-item-action">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">Ejemplos de Informes</h6>
-                                            <small>15 docs</small>
-                                        </div>
-                                    </a>
-                                </div>
-                                <button class="btn btn-outline-primary w-100 mt-3">
-                                    <i class="fas fa-plus"></i> Agregar Documento
-                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Tab Configuración -->
                 <div class="tab-pane fade" id="settings" role="tabpanel">
-                    
+                    <!-- Contenido de Configuración -->
                     <div class="row">
                         <!-- Configuraciones Principales -->
                         <div class="col-md-8">
@@ -872,23 +521,27 @@
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Nombre Completo</label>
-                                        <input type="text" class="form-control">
+                                        <input type="text" class="form-control" id="settingsFullName">
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">Número de Licencia</label>
-                                        <input type="text" class="form-control">
+                                        <input type="text" class="form-control" id="settingsLicense">
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">Especialidad Principal</label>
-                                        <input type="text" class="form-control">
+                                        <input type="text" class="form-control" id="settingsSpecialty">
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">Email Profesional</label>
-                                        <input type="email" class="form-control">
+                                        <input type="email" class="form-control" id="settingsEmail">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Teléfono</label>
+                                        <input type="tel" class="form-control" id="settingsPhone">
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Títulos y Certificaciones</label>
-                                        <textarea class="form-control" rows="3"></textarea>
+                                        <textarea class="form-control" id="settingsCertifications" rows="3"></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -903,11 +556,11 @@
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Formato de Numeración</label>
-                                            <input type="text" class="form-control" placeholder="INF-{YYYY}-{0000}">
+                                            <input type="text" class="form-control" id="reportNumberFormat" placeholder="INF-{YYYY}-{0000}">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Contador Actual</label>
-                                            <input type="number" class="form-control" value="1">
+                                            <input type="number" class="form-control" id="reportCounter" value="1">
                                         </div>
                                     </div>
                                 </div>
@@ -918,7 +571,7 @@
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Formato por Defecto</label>
-                                            <select class="form-select">
+                                            <select class="form-select" id="defaultPdfFormat">
                                                 <option>A4</option>
                                                 <option>Carta</option>
                                                 <option>Legal</option>
@@ -926,7 +579,7 @@
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Orientación por Defecto</label>
-                                            <select class="form-select">
+                                            <select class="form-select" id="defaultPdfOrientation">
                                                 <option>Vertical</option>
                                                 <option>Horizontal</option>
                                             </select>
@@ -939,11 +592,12 @@
                                     <h6 class="mb-3">Firma Digital</h6>
                                     <div class="mb-3">
                                         <label class="form-label">Imagen de Firma</label>
-                                        <input type="file" class="form-control">
+                                        <input type="file" class="form-control" id="signatureInput" accept="image/*">
+                                        <img id="signaturePreview" class="preview-image mt-2 d-none" style="max-height: 100px;">
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox">
-                                        <label class="form-check-label">Incluir firma digital automáticamente</label>
+                                        <input class="form-check-input" type="checkbox" id="autoIncludeSignature">
+                                        <label class="form-check-label" for="autoIncludeSignature">Incluir firma digital automáticamente</label>
                                     </div>
                                 </div>
                             </div>
@@ -954,27 +608,32 @@
                                 
                                 <!-- Acceso -->
                                 <div class="mb-4">
-                                    <h6 class="mb-3">Acceso</h6>
-                                    <div class="mb-3">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" class="form-control">
-                                    </div>
+                                    <h6 class="mb-3">Cambiar Contraseña</h6>
                                     <div class="mb-3">
                                         <label class="form-label">Contraseña Actual</label>
-                                        <input type="password" class="form-control">
+                                        <input type="password" class="form-control" id="currentPassword">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">Nueva Contraseña</label>
-                                        <input type="password" class="form-control">
+                                        <input type="password" class="form-control" id="newPassword">
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Confirmar Nueva Contraseña</label>
+                                        <input type="password" class="form-control" id="confirmNewPassword">
+                                    </div>
+                                    <button class="btn btn-primary" id="changePasswordBtn">Cambiar Contraseña</button>
                                 </div>
 
-                                <!-- Autenticación de Dos Factores -->
+                                <!-- Email -->
                                 <div class="mb-4">
-                                    <h6 class="mb-3">Autenticación de Dos Factores</h6>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox">
-                                        <label class="form-check-label">Activar autenticación de dos factores</label>
+                                    <h6 class="mb-3">Verificación de Email</h6>
+                                    <div class="d-flex align-items-center mb-3">
+                                        <span id="emailVerificationStatus" class="me-3">
+                                            <span class="badge bg-warning">No verificado</span>
+                                        </span>
+                                        <button class="btn btn-outline-primary btn-sm" id="sendVerificationEmailBtn">
+                                            Enviar Email de Verificación
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -990,29 +649,29 @@
                                 <div class="mb-4">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span>Último respaldo</span>
-                                        <small class="text-muted">Hace 2 horas</small>
+                                        <small class="text-muted" id="lastBackupTime">Nunca</small>
                                     </div>
                                     <div class="progress mb-2" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: 100%"></div>
+                                        <div class="progress-bar bg-success" id="backupProgress" style="width: 0%"></div>
                                     </div>
                                 </div>
 
                                 <!-- Opciones de Respaldo -->
                                 <div class="mb-3">
                                     <label class="form-label">Frecuencia de Respaldo</label>
-                                    <select class="form-select mb-2">
-                                        <option>Cada hora</option>
-                                        <option>Cada 6 horas</option>
-                                        <option>Cada 12 horas</option>
-                                        <option>Diariamente</option>
+                                    <select class="form-select mb-2" id="backupFrequency">
+                                        <option value="1">Cada hora</option>
+                                        <option value="6">Cada 6 horas</option>
+                                        <option value="12">Cada 12 horas</option>
+                                        <option value="24" selected>Diariamente</option>
                                     </select>
                                 </div>
 
                                 <div class="d-grid gap-2">
-                                    <button class="btn btn-primary">
+                                    <button class="btn btn-primary" id="backupNowBtn">
                                         <i class="fas fa-cloud-upload-alt"></i> Respaldar Ahora
                                     </button>
-                                    <button class="btn btn-outline-secondary">
+                                    <button class="btn btn-outline-secondary" id="viewBackupHistoryBtn">
                                         <i class="fas fa-history"></i> Ver Historial
                                     </button>
                                 </div>
@@ -1022,20 +681,20 @@
                             <div class="config-card mb-4">
                                 <h5 class="mb-3">Notificaciones</h5>
                                 <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked>
-                                    <label class="form-check-label">Recordatorios de informes pendientes</label>
+                                    <input class="form-check-input" type="checkbox" id="notifyPendingReports" checked>
+                                    <label class="form-check-label" for="notifyPendingReports">Recordatorios de informes pendientes</label>
                                 </div>
                                 <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked>
-                                    <label class="form-check-label">Alertas de seguridad</label>
+                                    <input class="form-check-input" type="checkbox" id="notifySecurityAlerts" checked>
+                                    <label class="form-check-label" for="notifySecurityAlerts">Alertas de seguridad</label>
                                 </div>
                                 <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox">
-                                    <label class="form-check-label">Actualizaciones del sistema</label>
+                                    <input class="form-check-input" type="checkbox" id="notifySystemUpdates">
+                                    <label class="form-check-label" for="notifySystemUpdates">Actualizaciones del sistema</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" checked>
-                                    <label class="form-check-label">Resúmenes semanales</label>
+                                    <input class="form-check-input" type="checkbox" id="notifyWeeklySummary" checked>
+                                    <label class="form-check-label" for="notifyWeeklySummary">Resúmenes semanales</label>
                                 </div>
                             </div>
 
@@ -1045,14 +704,14 @@
                                 <div class="mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span>Espacio utilizado</span>
-                                        <small class="text-muted">2.4 GB de 5 GB</small>
+                                        <small class="text-muted" id="storageUsed">0 KB de 100 MB</small>
                                     </div>
                                     <div class="progress" style="height: 10px;">
-                                        <div class="progress-bar bg-primary" style="width: 48%"></div>
+                                        <div class="progress-bar bg-primary" id="storageProgress" style="width: 0%"></div>
                                     </div>
                                 </div>
                                 <div class="d-grid">
-                                    <button class="btn btn-outline-danger">
+                                    <button class="btn btn-outline-danger" id="clearCacheBtn">
                                         <i class="fas fa-trash"></i> Limpiar Caché
                                     </button>
                                 </div>
@@ -1064,48 +723,89 @@
         </div>
     </div>
 
+    <!-- Modales -->
+    <!-- Modal de Nueva Sección -->
+    <div class="modal fade" id="newSectionModal" tabindex="-1" aria-labelledby="newSectionModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newSectionModalLabel">Agregar Nueva Sección</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="sectionName" class="form-label">Nombre de la Sección</label>
+                        <input type="text" class="form-control" id="sectionName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sectionType" class="form-label">Tipo de Campo</label>
+                        <select class="form-select" id="sectionType">
+                            <option value="text">Texto</option>
+                            <option value="checkbox">Casillas de Verificación</option>
+                            <option value="radio">Opciones Únicas</option>
+                            <option value="select">Lista Desplegable</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="optionsContainer" style="display: none;">
+                        <label class="form-label">Opciones</label>
+                        <div id="optionsList">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control option-input" placeholder="Opción 1">
+                                <button class="btn btn-outline-danger remove-option-btn" type="button">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm mt-2" id="addOptionBtn" type="button">
+                            <i class="fas fa-plus"></i> Agregar Opción
+                        </button>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sectionRequired">
+                        <label class="form-check-label" for="sectionRequired">Campo obligatorio</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="saveNewSectionBtn">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Advertencia de Sesión -->
+    <div class="modal fade" id="sessionWarningModal" tabindex="-1" aria-labelledby="sessionWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="sessionWarningModalLabel">Sesión a punto de expirar</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Su sesión expirará en <span id="sessionCountdown">60</span> segundos.</p>
+                    <p>¿Desea extender su sesión?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="extendSessionBtn">Extender Sesión</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast para notificaciones -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="notificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header" id="toastHeader">
+                <strong class="me-auto" id="toastTitle">Notificación</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Función para manejar la vista previa de imágenes
-        function handleImagePreview(input, previewId) {
-            const preview = document.getElementById(previewId);
-            const file = input.files[0];
-            
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    preview.classList.remove('d-none');
-                }
-                reader.readAsDataURL(file);
-            }
-        }
-
-        // Event listeners para las imágenes
-        document.getElementById('logoInput')?.addEventListener('change', function() {
-            handleImagePreview(this, 'logoPreview');
-        });
-
-        document.getElementById('headerInput')?.addEventListener('change', function() {
-            handleImagePreview(this, 'headerPreview');
-        });
-
-        document.getElementById('footerInput')?.addEventListener('change', function() {
-            handleImagePreview(this, 'footerPreview');
-        });
-
-        document.getElementById('watermarkInput')?.addEventListener('change', function() {
-            handleImagePreview(this, 'watermarkPreview');
-        });
-
-        // Actualizar vista previa cuando cambian los colores
-        document.getElementById('primaryColor')?.addEventListener('input', function(e) {
-            document.querySelector('.preview-title').style.color = e.target.value;
-        });
-
-        document.getElementById('secondaryColor')?.addEventListener('input', function(e) {
-            document.querySelector('.preview-text').style.color = e.target.value;
-        });
-    </script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/main.js"></script>
 </body>
 </html>

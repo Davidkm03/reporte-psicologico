@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/database');
-const auditLog = require('./middleware/auditMiddleware');
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 const securityHeaders = require('./middleware/securityHeaders');
 
@@ -14,37 +13,35 @@ console.log('Express app initialized');
 // Middleware
 console.log('Initializing middleware...');
 app.use(securityHeaders);
-app.use(auditLog);
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 console.log('Middleware initialized');
 
-// Serve static files from frontend
-app.use('/static', express.static(path.join(__dirname, '../frontend/assets')));
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const configRoutes = require('./routes/configRoutes');
+const templateRoutes = require('./routes/templateRoutes');
+const { testAPI } = require('./controllers/baseController');
+const reportRoutes = require('./routes/reportRoutes');
 
 // Database Connection
 connectDB();
 
-// Import routes
-const mainRoutes = require('./routes');
-const authRoutes = require('./routes/authRoutes');
-const configRoutes = require('./routes/configRoutes');
-const templateRoutes = require('./routes/templateRoutes');
-
-
-// Use Routes with rate limiting
-app.use('/api', apiLimiter, mainRoutes);
+// API Routes with rate limiting
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/config', apiLimiter, configRoutes);
 app.use('/api/templates', apiLimiter, templateRoutes);
+app.get('/api/test', testAPI);
+app.use('/api/reports', apiLimiter, reportRoutes);
 
-console.log('Routes setup complete');
+// Serve static files from frontend
+app.use('/static', express.static(path.join(__dirname, '../frontend/assets')));
+app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+    res.sendFile(path.resolve(__dirname, '../frontend/index.html'));
 });
 
 // Error handling for undefined routes
@@ -55,11 +52,15 @@ app.use((req, res, next) => {
 // Error Handling Middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    res.status(500).json({ 
-        error: 'Something went wrong!',
-        message: err.message 
+    res.status(err.statusCode || 500).json({ 
+        error: err.message || 'Something went wrong!',
+        stack: process.env.NODE_ENV === 'production' ? null : err.stack
     });
 });
+
+// Add the audit middleware after routes are registered
+const auditLog = require('./middleware/auditMiddleware');
+app.use(auditLog);
 
 // Server Setup
 const PORT = process.env.PORT || 5000;
@@ -76,3 +77,5 @@ process.on('unhandledRejection', (err, promise) => {
     // Close server & exit process
     server.close(() => process.exit(1));
 });
+
+module.exports = app;
