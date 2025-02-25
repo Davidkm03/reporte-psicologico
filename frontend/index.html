@@ -78,6 +78,7 @@
                 <div class="tab-pane fade show active" id="personalization" role="tabpanel">
                     <div class="row">
                         <div class="col-md-8">
+                            <!-- Identidad Visual -->
                             <div class="config-card">
                                 <h4 class="mb-4">Identidad Visual</h4>
                                 
@@ -198,6 +199,7 @@
                             <div class="config-card">
                                 <h4 class="mb-4">Vista Previa</h4>
                                 <div id="stylePreview" class="border rounded p-4">
+                                    <!-- La vista previa se actualizará dinámicamente -->
                                     <div class="text-center mb-4">
                                         <img src="/static/images/placeholder-logo.png" alt="Logo Preview" class="mb-3 preview-logo">
                                     </div>
@@ -213,6 +215,7 @@
 
                 <!-- Tab Plantillas -->
                 <div class="tab-pane fade" id="templates" role="tabpanel">
+                    <!-- Contenido de Plantillas -->
                     <div class="row">
                         <!-- Lista de Plantillas -->
                         <div class="col-md-4">
@@ -302,6 +305,7 @@
                 
                 <!-- Tab Informe -->
                 <div class="tab-pane fade" id="report" role="tabpanel">
+                    <!-- Contenido de Informe -->
                     <div class="row">
                         <!-- Formulario del Informe -->
                         <div class="col-md-8">
@@ -381,6 +385,7 @@
                             <div class="config-card">
                                 <h5 class="mb-3">Vista Previa Rápida</h5>
                                 <div class="border rounded p-3 bg-light" id="reportPreviewPanel" style="height: 500px; overflow-y: auto;">
+                                    <!-- Aquí se mostrará la vista previa del informe -->
                                     <div class="text-center text-muted">
                                         <i class="fas fa-file-alt fa-3x mb-3"></i>
                                         <p>La vista previa se actualizará automáticamente mientras escribes</p>
@@ -393,6 +398,7 @@
                 
                 <!-- Tab Asistente IA -->
                 <div class="tab-pane fade" id="ai-assistant" role="tabpanel">
+                    <!-- Contenido del Asistente IA -->
                     <div class="row">
                         <!-- Panel Principal del Asistente -->
                         <div class="col-md-8">
@@ -505,6 +511,7 @@
                 
                 <!-- Tab Configuración -->
                 <div class="tab-pane fade" id="settings" role="tabpanel">
+                    <!-- Contenido de Configuración -->
                     <div class="row">
                         <!-- Configuraciones Principales -->
                         <div class="col-md-8">
@@ -536,20 +543,6 @@
                                         <label class="form-label">Títulos y Certificaciones</label>
                                         <textarea class="form-control" id="settingsCertifications" rows="3"></textarea>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Configuración de IA -->
-                            <div class="config-card mb-4">
-                                <h5 class="mb-4">Configuración de IA</h5>
-                                <div class="mb-3">
-                                    <label class="form-label">API Key de Open AI</label>
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" id="openAiApiKey" placeholder="Ingresa tu API Key aquí">
-                                        <button class="btn btn-primary" id="saveApiKeyBtn">Guardar</button>
-                                    </div>
-                                    <small class="text-muted d-block mt-2">Ingresa tu clave de Open AI para habilitar el Asistente IA.</small>
-                                    <p id="apiKeyStatus" class="mt-2"></p>
                                 </div>
                             </div>
 
@@ -780,6 +773,26 @@
         </div>
     </div>
 
+    <!-- Modal de Advertencia de Sesión -->
+    <div class="modal fade" id="sessionWarningModal" tabindex="-1" aria-labelledby="sessionWarningModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="sessionWarningModalLabel">Sesión a punto de expirar</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Su sesión expirará en <span id="sessionCountdown">60</span> segundos.</p>
+                    <p>¿Desea extender su sesión?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="extendSessionBtn">Extender Sesión</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast para notificaciones -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="notificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
@@ -791,64 +804,8 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/auth.js"></script>
     <script src="assets/js/main.js"></script>
-    <script>
-        // Función para mostrar notificaciones (necesaria aquí porque main.js usa showToast)
-        function showToast(message, type = 'info') {
-            const toastEl = document.getElementById('notificationToast');
-            const toastHeader = document.getElementById('toastHeader');
-            const toastTitle = document.getElementById('toastTitle');
-            const toastMessage = document.getElementById('toastMessage');
-            
-            if (!toastEl || !toastHeader || !toastTitle || !toastMessage) return;
-            
-            if (type === 'error') {
-                toastHeader.className = 'toast-header bg-danger text-white';
-                toastTitle.textContent = 'Error';
-            } else if (type === 'success') {
-                toastHeader.className = 'toast-header bg-success text-white';
-                toastTitle.textContent = 'Éxito';
-            } else {
-                toastHeader.className = 'toast-header bg-info text-white';
-                toastTitle.textContent = 'Información';
-            }
-            
-            toastMessage.textContent = message;
-            const toast = new bootstrap.Toast(toastEl);
-            toast.show();
-        }
-
-        // Guardar API Key
-        document.getElementById('saveApiKeyBtn')?.addEventListener('click', () => {
-            if (!isAuthenticated()) {
-                showToast('Debes estar autenticado para guardar la API Key.', 'error');
-                return;
-            }
-            const keyInput = document.getElementById('openAiApiKey').value.trim();
-            const status = document.getElementById('apiKeyStatus');
-            if (keyInput) {
-                localStorage.setItem('openAIKey', keyInput);
-                status.textContent = 'API Key guardada correctamente.';
-                status.className = 'text-success';
-                document.getElementById('openAiApiKey').value = '';
-            } else {
-                status.textContent = 'Por favor, ingresa una API Key válida.';
-                status.className = 'text-danger';
-            }
-        });
-
-        // Mostrar estado de la API Key al cargar
-        document.addEventListener('DOMContentLoaded', () => {
-            const apiKey = localStorage.getItem('openAIKey');
-            const status = document.getElementById('apiKeyStatus');
-            if (apiKey) {
-                status.textContent = 'API Key cargada desde almacenamiento local.';
-                status.className = 'text-success';
-            }
-        });
-    </script>
 </body>
 </html>

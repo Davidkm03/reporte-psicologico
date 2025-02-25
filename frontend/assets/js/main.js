@@ -1053,7 +1053,7 @@ function updateReportPreview() {
     previewPanel.appendChild(preview);
 }
 
-// Funciones para la página del Asistente IA (usando Open AI directamente)
+// Funciones para la página del Asistente IA
 function handleAIAssistant() {
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
@@ -1062,53 +1062,39 @@ function handleAIAssistant() {
     
     if (!chatInput || !sendChatBtn || !chatHistory || !newChatBtn) return;
     
-    // Enviar mensaje a Open AI
+    // Enviar mensaje
     const sendMessage = async () => {
-        if (!isAuthenticated()) {
-            showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
-            return;
-        }
-        
         const message = chatInput.value.trim();
-        if (!message) {
-            showToast('Por favor, escribe un mensaje.', 'warning');
-            return;
-        }
-        
-        const apiKey = localStorage.getItem('openAIKey');
-        if (!apiKey) {
-            showToast('Por favor, configura tu API Key en la pestaña de Configuración.', 'error');
-            return;
-        }
+        if (!message) return;
         
         // Agregar mensaje del usuario
         appendUserMessage(message);
+        
+        // Limpiar input
         chatInput.value = '';
         
         // Mostrar indicador de carga
         const loadingIndicator = appendLoadingIndicator();
         
         try {
+            // Obtener estilo y nivel de detalle seleccionados
             const style = document.getElementById('assistantStyle')?.value || 'formal';
             const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
-            const temperature = detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5;
             
-            const prompt = `Actúa como un asistente especializado en informes psicológicos con un estilo de redacción "${style}" y un nivel de detalle "${detailLevel}". Responde al siguiente mensaje: "${message}"`;
-            
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            // Enviar mensaje al servidor
+            const response = await fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
-                    messages: [
-                        { role: 'system', content: 'Eres un asistente especializado en informes psicológicos.' },
-                        { role: 'user', content: prompt }
-                    ],
-                    max_tokens: detailLevel === 'detailed' ? 1000 : detailLevel === 'brief' ? 200 : 500,
-                    temperature: temperature
+                    message,
+                    options: {
+                        style,
+                        detailLevel,
+                        temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
+                    }
                 })
             });
             
@@ -1119,16 +1105,25 @@ function handleAIAssistant() {
             
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error?.message || `Error ${response.status}`);
+                throw new Error(errorData.message || `Error: ${response.status}`);
             }
             
             const data = await response.json();
-            appendAssistantMessage(data.choices[0].message.content.trim());
+            
+            // Mostrar respuesta
+            appendAssistantMessage(data.response);
         } catch (error) {
+            // Quitar indicador de carga si aún existe
             if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
                 chatHistory.removeChild(loadingIndicator);
             }
-            appendAssistantMessage(`Lo siento, ocurrió un error: ${error.message}. Verifica tu API Key o intenta de nuevo.`);
+            
+            console.error('Error en chat AI:', error);
+            appendAssistantMessage(
+                'Lo siento, ha ocurrido un error al procesar tu mensaje. ' +
+                'Por favor, intenta de nuevo o contacta al soporte técnico. ' +
+                `Detalles: ${error.message}`
+            );
         }
     };
     
@@ -1145,10 +1140,6 @@ function handleAIAssistant() {
     
     // Evento para nueva conversación
     newChatBtn.addEventListener('click', () => {
-        if (!isAuthenticated()) {
-            showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
-            return;
-        }
         // Limpiar historial excepto el mensaje inicial
         while (chatHistory.children.length > 1) {
             chatHistory.removeChild(chatHistory.lastChild);
@@ -1159,101 +1150,105 @@ function handleAIAssistant() {
     // Botones de sugerencias
     document.querySelectorAll('#contentSuggestions button').forEach(btn => {
         btn.addEventListener('click', async () => {
-            const promptType = btn.dataset.prompt;
-            if (!promptType) return;
+            const prompt = btn.dataset.prompt;
+            if (!prompt) return;
             
-            if (!isAuthenticated()) {
-                showToast('Debes estar autenticado para usar el Asistente IA.', 'error');
-                return;
-            }
-            
-            const apiKey = localStorage.getItem('openAIKey');
-            if (!apiKey) {
-                showToast('Por favor, configura tu API Key en la pestaña de Configuración.', 'error');
-                return;
-            }
-            
-            let userMessage = '';
-            let sectionType = 'general';
-            
-            switch (promptType) {
-                case 'sugerir conclusiones':
-                    userMessage = 'Sugiere conclusiones para un informe psicológico basado en una evaluación general.';
-                    sectionType = 'conclusions';
-                    break;
-                case 'sugerir recomendaciones':
-                    userMessage = 'Propón recomendaciones para un paciente tras una evaluación psicológica.';
-                    sectionType = 'recommendations';
-                    break;
-                case 'redactar resumen':
-                    userMessage = 'Redacta un resumen ejecutivo para un informe psicológico.';
-                    sectionType = 'summary';
-                    break;
-                case 'mejorar redacción':
-                    userMessage = 'Mejora la redacción de este texto: "El paciente muestra ansiedad alta y dificultades para dormir."';
-                    break;
-                default:
-                    userMessage = promptType;
-            }
-            
-            // Si es un prompt relacionado con el informe, incluir datos del informe
-            if (promptType.startsWith('sugerir') || promptType.startsWith('redactar')) {
+            // Si es un prompt para generar contenido para el informe
+            if (prompt.startsWith('sugerir') || prompt.startsWith('redactar')) {
+                // Verificar si hay un informe activo
                 if (!state.selectedTemplateId) {
                     showToast('Primero debes seleccionar una plantilla de informe', 'error');
                     return;
                 }
                 
-                const reportData = collectReportData();
-                userMessage = `${userMessage}\nDatos del informe: ${JSON.stringify(reportData, null, 2)}`;
-            }
-            
-            // Mostrar mensaje del usuario
-            appendUserMessage(userMessage);
-            
-            // Mostrar indicador de carga
-            const loadingIndicator = appendLoadingIndicator();
-            
-            try {
-                const style = document.getElementById('assistantStyle')?.value || 'formal';
-                const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
-                const temperature = detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5;
-                
-                const prompt = `Actúa como un asistente especializado en informes psicológicos con un estilo de redacción "${style}" y un nivel de detalle "${detailLevel}". Responde al siguiente mensaje: "${userMessage}"`;
-                
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-3.5-turbo',
-                        messages: [
-                            { role: 'system', content: 'Eres un asistente especializado en informes psicológicos.' },
-                            { role: 'user', content: prompt }
-                        ],
-                        max_tokens: detailLevel === 'detailed' ? 1000 : detailLevel === 'brief' ? 200 : 500,
-                        temperature: temperature
-                    })
-                });
-                
-                // Quitar indicador de carga
-                if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
-                    chatHistory.removeChild(loadingIndicator);
+                // Reconstruir el botón como mensaje
+                let userMessage = '';
+                switch (prompt) {
+                    case 'sugerir conclusiones':
+                        userMessage = 'Por favor, genera conclusiones para mi informe';
+                        break;
+                    case 'sugerir recomendaciones':
+                        userMessage = 'Por favor, genera recomendaciones para mi informe';
+                        break;
+                    case 'redactar resumen':
+                        userMessage = 'Por favor, genera un resumen ejecutivo para mi informe';
+                        break;
+                    case 'mejorar redacción':
+                        userMessage = 'Por favor, mejora la redacción de mi informe';
+                        break;
+                    default:
+                        userMessage = prompt;
                 }
                 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error?.message || `Error ${response.status}`);
-                }
+                // Mostrar mensaje del usuario
+                appendUserMessage(userMessage);
                 
-                const data = await response.json();
-                appendAssistantMessage(data.choices[0].message.content.trim());
-            } catch (error) {
-                if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
-                    chatHistory.removeChild(loadingIndicator);
+                // Mostrar indicador de carga
+                const loadingIndicator = appendLoadingIndicator();
+                
+                try {
+                    // Recopilar datos del informe actual
+                    const reportData = collectReportData();
+                    
+                    // Determinar el tipo de contenido a generar
+                    let sectionType = 'general';
+                    if (prompt.includes('conclusiones')) sectionType = 'conclusions';
+                    if (prompt.includes('recomendaciones')) sectionType = 'recommendations';
+                    if (prompt.includes('resumen')) sectionType = 'summary';
+                    
+                    // Obtener estilo y nivel de detalle seleccionados
+                    const style = document.getElementById('assistantStyle')?.value || 'formal';
+                    const detailLevel = document.getElementById('assistantDetail')?.value || 'standard';
+                    
+                    // Generar contenido mediante la API
+                    const response = await fetch('/api/ai/generate-content', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        },
+                        body: JSON.stringify({
+                            sectionType,
+                            reportData,
+                            options: {
+                                style,
+                                detailLevel,
+                                temperature: detailLevel === 'detailed' ? 0.7 : detailLevel === 'brief' ? 0.3 : 0.5
+                            }
+                        })
+                    });
+                    
+                    // Quitar indicador de carga
+                    if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                        chatHistory.removeChild(loadingIndicator);
+                    }
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `Error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Mostrar respuesta
+                    appendAssistantMessage(data.content);
+                } catch (error) {
+                    // Quitar indicador de carga si aún existe
+                    if (loadingIndicator && loadingIndicator.parentNode === chatHistory) {
+                        chatHistory.removeChild(loadingIndicator);
+                    }
+                    
+                    console.error('Error generando contenido:', error);
+                    appendAssistantMessage(
+                        'Lo siento, ha ocurrido un error al generar el contenido. ' +
+                        'Por favor, intenta de nuevo o contacta al soporte técnico. ' +
+                        `Detalles: ${error.message}`
+                    );
                 }
-                appendAssistantMessage(`Lo siento, ocurrió un error: ${error.message}. Verifica tu API Key o intenta de nuevo.`);
+            } else {
+                // Para otros tipos de prompts
+                chatInput.value = prompt;
+                sendMessage();
             }
         });
     });
@@ -1286,6 +1281,52 @@ function appendAssistantMessage(message) {
     const chatHistory = document.getElementById('chatHistory');
     if (!chatHistory) return;
     
+    // Convertir markdown a HTML si es necesario
+    let formattedMessage = message;
+    
+    // Detectar si el mensaje contiene markdown (títulos, listas, etc.)
+    const hasMarkdown = /^#{1,6}\s|(\*|\-|\+|\d+\.)\s|\*\*|\*|_|`/.test(message);
+    
+    if (hasMarkdown) {
+        // Simple conversión de markdown a HTML
+        formattedMessage = message
+            // Headers (## Título -> <h2>Título</h2>)
+            .replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>')
+            .replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>')
+            .replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>')
+            .replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>')
+            .replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>')
+            .replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>')
+            
+            // Bold (**text** -> <strong>text</strong>)
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            
+            // Italic (*text* -> <em>text</em>)
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            
+            // Code blocks (```code``` -> <pre><code>code</code></pre>)
+            .replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>')
+            
+            // Inline code (`code` -> <code>code</code>)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            
+            // Unordered lists
+            .replace(/^\s*[\*\-\+]\s+(.+)$/gm, '<li>$1</li>')
+            
+            // Ordered lists
+            .replace(/^\s*\d+\.\s+(.+)$/gm, '<li>$1</li>')
+            
+            // Wrap lists with <ul> or <ol> tags
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            
+            // Paragraphs (blank lines between text -> <p>text</p>)
+            .replace(/^([^<].+)$/gm, '<p>$1</p>')
+            
+            // Fix duplicate paragraph tags
+            .replace(/<p><p>/g, '<p>')
+            .replace(/<\/p><\/p>/g, '</p>');
+    }
+    
     const messageEl = document.createElement('div');
     messageEl.className = 'd-flex mb-3';
     messageEl.innerHTML = `
@@ -1294,7 +1335,7 @@ function appendAssistantMessage(message) {
         </div>
         <div class="flex-grow-1 ms-3">
             <div class="bg-light rounded p-3">
-                <p class="mb-0">${message}</p>
+                <div class="markdown-content">${formattedMessage}</div>
             </div>
         </div>
     `;
@@ -1440,6 +1481,7 @@ function previewReport() {
     // En un sistema real, esto generaría un PDF temporal
     const reportData = collectReportData();
     
+    // Enviar datos para previsualización
     try {
         fetch('/api/reports/preview-pdf', {
             method: 'POST',
@@ -1482,7 +1524,7 @@ function downloadReportPdf() {
         return;
     }
     
-    // Recopilar datos del formulario
+    // Recopilar datos del informe
     const reportData = collectReportData();
     
     // Enviar datos para generación y descarga de PDF
